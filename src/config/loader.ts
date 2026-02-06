@@ -31,6 +31,16 @@ export function loadConfig(): AgentSystemConfig {
       owner: required("GITHUB_OWNER"),
       repo: required("GITHUB_REPO"),
     },
+    google: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH ||
+      process.env.GOOGLE_CLIENT_EMAIL
+      ? {
+          serviceAccountKeyPath: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH,
+          clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
+          privateKey: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+          ga4PropertyId: process.env.GA4_PROPERTY_ID,
+          searchConsoleSiteUrl: process.env.SEARCH_CONSOLE_SITE_URL,
+        }
+      : undefined,
     pollIntervalMs: parseInt(optional("POLL_INTERVAL_MS", "30000"), 10),
     maxConcurrentAgents: parseInt(optional("MAX_CONCURRENT_AGENTS", "3"), 10),
     autoAssign: optional("AUTO_ASSIGN", "true") === "true",

@@ -107,6 +107,13 @@ export interface AgentSystemConfig {
     owner: string;
     repo: string;
   };
+  google?: {
+    serviceAccountKeyPath?: string;
+    clientEmail?: string;
+    privateKey?: string;
+    ga4PropertyId?: string;
+    searchConsoleSiteUrl?: string;
+  };
   pollIntervalMs: number;
   maxConcurrentAgents: number;
   autoAssign: boolean;

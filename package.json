@@ -19,7 +19,9 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "dotenv": "^17.2.4"
+    "@google-analytics/data": "^5.2.1",
+    "dotenv": "^17.2.4",
+    "googleapis": "^171.4.0"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -31,14 +31,13 @@ export function loadConfig(): AgentSystemConfig {
       owner: required("GITHUB_OWNER"),
       repo: required("GITHUB_REPO"),
     },
-    google: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH ||
-      process.env.GOOGLE_CLIENT_EMAIL
+    umami: process.env.UMAMI_SERVER_URL
       ? {
-          serviceAccountKeyPath: process.env.GOOGLE_SERVICE_ACCOUNT_KEY_PATH,
-          clientEmail: process.env.GOOGLE_CLIENT_EMAIL,
-          privateKey: process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
-          ga4PropertyId: process.env.GA4_PROPERTY_ID,
-          searchConsoleSiteUrl: process.env.SEARCH_CONSOLE_SITE_URL,
+          serverUrl: required("UMAMI_SERVER_URL"),
+          username: required("UMAMI_USERNAME"),
+          password: required("UMAMI_PASSWORD"),
+          websiteId: required("UMAMI_WEBSITE_ID"),
+          timezone: process.env.UMAMI_TIMEZONE,
         }
       : undefined,
     pollIntervalMs: parseInt(optional("POLL_INTERVAL_MS", "30000"), 10),

@@ -19,9 +19,8 @@
     "test:watch": "vitest"
   },
   "dependencies": {
-    "@google-analytics/data": "^5.2.1",
-    "dotenv": "^17.2.4",
-    "googleapis": "^171.4.0"
+    "@umami/api-client": "^0.80.0",
+    "dotenv": "^17.2.4"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

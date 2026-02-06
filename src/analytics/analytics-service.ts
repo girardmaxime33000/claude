@@ -1,80 +1,52 @@
 // ============================================================
-// Unified Analytics Facade — combines GA4 + Search Console
+// Unified Analytics Service — wraps Umami API
 // ============================================================
 
-import { GA4Client } from "./ga4-client.js";
-import { SearchConsoleClient } from "./search-console-client.js";
-import type { GoogleAuthConfig, AnalyticsSummary } from "./types.js";
-
-export interface AnalyticsConfig {
-  auth: GoogleAuthConfig;
-  /** GA4 property ID (numeric) */
-  ga4PropertyId: string;
-  /** Search Console site URL (e.g. "https://example.com" or "sc-domain:example.com") */
-  searchConsoleSiteUrl: string;
-}
+import { UmamiClient } from "./umami-client.js";
+import type { UmamiConfig, UmamiDateRange, AnalyticsSummary } from "./types.js";
 
 export class AnalyticsService {
-  public readonly ga4: GA4Client;
-  public readonly searchConsole: SearchConsoleClient;
-  private readonly propertyId: string;
-  private readonly siteUrl: string;
+  public readonly umami: UmamiClient;
 
-  constructor(config: AnalyticsConfig) {
-    this.ga4 = new GA4Client(config.auth);
-    this.searchConsole = new SearchConsoleClient(config.auth);
-    this.propertyId = config.ga4PropertyId;
-    this.siteUrl = config.searchConsoleSiteUrl;
+  constructor(config: UmamiConfig) {
+    this.umami = new UmamiClient(config);
   }
 
   /**
-   * Generate a full analytics summary combining GA4 and Search Console data.
+   * Generate a full analytics summary for a date range.
    */
-  async getSummary(startDate: string, endDate: string): Promise<AnalyticsSummary> {
-    const [keyMetrics, topPages, topCountries, topQueries, topSearchPages] =
+  async getSummary(range: UmamiDateRange): Promise<AnalyticsSummary> {
+    const [stats, topPages, topReferrers, topCountries, topBrowsers, topDevices, topEvents] =
       await Promise.all([
-        this.ga4.getKeyMetrics(this.propertyId, startDate, endDate),
-        this.ga4.getTopPages(this.propertyId, startDate, endDate, 10),
-        this.ga4.getTopCountries(this.propertyId, startDate, endDate, 10),
-        this.searchConsole.getTopQueries(this.siteUrl, startDate, endDate, 10),
-        this.searchConsole.getTopPages(this.siteUrl, startDate, endDate, 10),
+        this.umami.getStats(range),
+        this.umami.getTopPages(range, 10),
+        this.umami.getTopReferrers(range, 10),
+        this.umami.getTopCountries(range, 10),
+        this.umami.getTopBrowsers(range, 10),
+        this.umami.getTopDevices(range, 10),
+        this.umami.getEvents(range),
       ]);
 
-    const scTotals = topQueries.reduce(
-      (acc, q) => {
-        acc.clicks += q.clicks;
-        acc.impressions += q.impressions;
-        return acc;
-      },
-      { clicks: 0, impressions: 0 },
-    );
-
-    const averageCtr =
-      scTotals.impressions > 0 ? scTotals.clicks / scTotals.impressions : 0;
-    const averagePosition =
-      topQueries.length > 0
-        ? topQueries.reduce((sum, q) => sum + q.position, 0) / topQueries.length
-        : 0;
-
     return {
-      ga4: {
-        sessions: keyMetrics.sessions,
-        activeUsers: keyMetrics.activeUsers,
-        pageViews: keyMetrics.pageViews,
-        avgSessionDuration: keyMetrics.avgSessionDuration,
-        bounceRate: keyMetrics.bounceRate,
-        topPages,
-        topCountries,
-      },
-      searchConsole: {
-        totalClicks: scTotals.clicks,
-        totalImpressions: scTotals.impressions,
-        averageCtr,
-        averagePosition,
-        topQueries,
-        topPages: topSearchPages,
-      },
-      period: { startDate, endDate },
+      stats,
+      topPages,
+      topReferrers,
+      topCountries,
+      topBrowsers,
+      topDevices,
+      topEvents,
+      period: range,
+    };
+  }
+
+  /**
+   * Helper: create a date range from "days ago" to now.
+   */
+  static daysAgo(days: number): UmamiDateRange {
+    const now = Date.now();
+    return {
+      startAt: now - days * 24 * 60 * 60 * 1000,
+      endAt: now,
     };
   }
 
@@ -83,71 +55,81 @@ export class AnalyticsService {
    */
   static formatSummaryAsMarkdown(summary: AnalyticsSummary): string {
     const lines: string[] = [];
+    const start = new Date(summary.period.startAt).toISOString().split("T")[0];
+    const end = new Date(summary.period.endAt).toISOString().split("T")[0];
 
-    lines.push(`# Analytics Report`);
-    lines.push(`**Period:** ${summary.period.startDate} — ${summary.period.endDate}`);
-    lines.push("");
-
-    // GA4 section
-    lines.push("## Google Analytics (GA4)");
-    lines.push("");
-    lines.push(`| Metric | Value |`);
-    lines.push(`|--------|-------|`);
-    lines.push(`| Sessions | ${summary.ga4.sessions.toLocaleString()} |`);
-    lines.push(`| Active Users | ${summary.ga4.activeUsers.toLocaleString()} |`);
-    lines.push(`| Page Views | ${summary.ga4.pageViews.toLocaleString()} |`);
-    lines.push(`| Avg Session Duration | ${summary.ga4.avgSessionDuration.toFixed(1)}s |`);
-    lines.push(`| Bounce Rate | ${(summary.ga4.bounceRate * 100).toFixed(1)}% |`);
+    lines.push(`# Umami Analytics Report`);
+    lines.push(`**Period:** ${start} — ${end}`);
     lines.push("");
 
-    lines.push("### Top Pages");
+    // Global stats
+    const s = summary.stats;
+    const bounceRate = s.visits.value > 0
+      ? ((s.bounces.value / s.visits.value) * 100).toFixed(1)
+      : "0.0";
+    const avgTime = s.visits.value > 0
+      ? (s.totaltime.value / s.visits.value).toFixed(0)
+      : "0";
+
+    lines.push("## Overview");
     lines.push("");
-    lines.push(`| Page | Views |`);
-    lines.push(`|------|-------|`);
-    for (const p of summary.ga4.topPages) {
-      lines.push(`| ${p.path} | ${p.views.toLocaleString()} |`);
+    lines.push(`| Metric | Current | Previous |`);
+    lines.push(`|--------|---------|----------|`);
+    lines.push(`| Page Views | ${s.pageviews.value.toLocaleString()} | ${s.pageviews.prev.toLocaleString()} |`);
+    lines.push(`| Visitors | ${s.visitors.value.toLocaleString()} | ${s.visitors.prev.toLocaleString()} |`);
+    lines.push(`| Visits | ${s.visits.value.toLocaleString()} | ${s.visits.prev.toLocaleString()} |`);
+    lines.push(`| Bounces | ${s.bounces.value.toLocaleString()} | ${s.bounces.prev.toLocaleString()} |`);
+    lines.push(`| Bounce Rate | ${bounceRate}% | — |`);
+    lines.push(`| Avg Visit Time | ${avgTime}s | — |`);
+    lines.push("");
+
+    // Top pages
+    lines.push("## Top Pages");
+    lines.push("");
+    lines.push(`| URL | Views |`);
+    lines.push(`|-----|-------|`);
+    for (const p of summary.topPages) {
+      lines.push(`| ${p.x} | ${p.y.toLocaleString()} |`);
     }
     lines.push("");
 
-    lines.push("### Top Countries");
+    // Top referrers
+    lines.push("## Top Referrers");
     lines.push("");
-    lines.push(`| Country | Users |`);
-    lines.push(`|---------|-------|`);
-    for (const c of summary.ga4.topCountries) {
-      lines.push(`| ${c.country} | ${c.users.toLocaleString()} |`);
+    lines.push(`| Referrer | Visits |`);
+    lines.push(`|----------|--------|`);
+    for (const r of summary.topReferrers) {
+      lines.push(`| ${r.x || "(direct)"} | ${r.y.toLocaleString()} |`);
     }
     lines.push("");
 
-    // Search Console section
-    lines.push("## Google Search Console");
+    // Top countries
+    lines.push("## Top Countries");
     lines.push("");
-    lines.push(`| Metric | Value |`);
-    lines.push(`|--------|-------|`);
-    lines.push(`| Total Clicks | ${summary.searchConsole.totalClicks.toLocaleString()} |`);
-    lines.push(`| Total Impressions | ${summary.searchConsole.totalImpressions.toLocaleString()} |`);
-    lines.push(`| Average CTR | ${(summary.searchConsole.averageCtr * 100).toFixed(2)}% |`);
-    lines.push(`| Average Position | ${summary.searchConsole.averagePosition.toFixed(1)} |`);
-    lines.push("");
-
-    lines.push("### Top Queries");
-    lines.push("");
-    lines.push(`| Query | Clicks | Impressions | CTR | Position |`);
-    lines.push(`|-------|--------|-------------|-----|----------|`);
-    for (const q of summary.searchConsole.topQueries) {
-      lines.push(
-        `| ${q.query} | ${q.clicks} | ${q.impressions} | ${(q.ctr * 100).toFixed(2)}% | ${q.position.toFixed(1)} |`,
-      );
+    lines.push(`| Country | Visitors |`);
+    lines.push(`|---------|----------|`);
+    for (const c of summary.topCountries) {
+      lines.push(`| ${c.x} | ${c.y.toLocaleString()} |`);
     }
     lines.push("");
 
-    lines.push("### Top Pages (Search)");
+    // Top browsers
+    lines.push("## Top Browsers");
     lines.push("");
-    lines.push(`| Page | Clicks | Impressions | CTR | Position |`);
-    lines.push(`|------|--------|-------------|-----|----------|`);
-    for (const p of summary.searchConsole.topPages) {
-      lines.push(
-        `| ${p.page} | ${p.clicks} | ${p.impressions} | ${(p.ctr * 100).toFixed(2)}% | ${p.position.toFixed(1)} |`,
-      );
+    lines.push(`| Browser | Visitors |`);
+    lines.push(`|---------|----------|`);
+    for (const b of summary.topBrowsers) {
+      lines.push(`| ${b.x} | ${b.y.toLocaleString()} |`);
+    }
+    lines.push("");
+
+    // Top devices
+    lines.push("## Top Devices");
+    lines.push("");
+    lines.push(`| Device | Visitors |`);
+    lines.push(`|--------|----------|`);
+    for (const d of summary.topDevices) {
+      lines.push(`| ${d.x} | ${d.y.toLocaleString()} |`);
     }
 
     return lines.join("\n");

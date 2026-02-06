@@ -2,13 +2,18 @@ import type {
   AgentDomain,
   AgentResult,
   AgentSystemConfig,
+  CardCreationResult,
+  GeneratedPrompt,
   MarketingTask,
+  PromptGenerationRequest,
   WorkflowStage,
 } from "../config/types.js";
 import { AGENT_MAP } from "../config/agents.js";
 import { TrelloClient } from "../trello/client.js";
+import { CardCreator } from "../trello/card-creator.js";
 import { MarketingAgent } from "../agents/base-agent.js";
 import { DeliverableManager } from "../deliverables/manager.js";
+import { PromptGenerator } from "../prompts/generator.js";
 
 interface RunningTask {
   task: MarketingTask;
@@ -27,6 +32,8 @@ interface RunningTask {
 export class Orchestrator {
   private config: AgentSystemConfig;
   private trello: TrelloClient;
+  private cardCreator: CardCreator;
+  private promptGenerator: PromptGenerator;
   private deliverables: DeliverableManager;
   private agents: Map<AgentDomain, MarketingAgent> = new Map();
   private running: Map<string, RunningTask> = new Map();
@@ -39,15 +46,58 @@ export class Orchestrator {
       config.trello.token,
       config.trello.boardId
     );
+    this.cardCreator = new CardCreator(this.trello);
+    this.promptGenerator = new PromptGenerator(config.anthropic.apiKey);
     this.deliverables = new DeliverableManager(config.github);
 
-    // Initialize all agents
+    // Initialize all agents with card creation and prompt generation
     for (const [domain, definition] of AGENT_MAP) {
-      this.agents.set(
-        domain,
-        new MarketingAgent(definition, config.anthropic.apiKey)
-      );
+      const agent = new MarketingAgent(definition, config.anthropic.apiKey);
+      agent.setPromptGenerator(this.promptGenerator);
+      agent.setCardCreator(this.cardCreator);
+      this.agents.set(domain, agent);
     }
+  }
+
+  // ============================================================
+  // Card Creation API
+  // ============================================================
+
+  /**
+   * Create a Trello card directly.
+   * Can be used from the CLI or programmatically.
+   */
+  async createCard(
+    request: import("../config/types.js").CardCreationRequest
+  ): Promise<CardCreationResult> {
+    await this.trello.initialize();
+    return this.cardCreator.createFromRequest(request);
+  }
+
+  /**
+   * Generate prompts for agents from a high-level objective,
+   * then create Trello cards for each.
+   */
+  async generateAndCreateCards(
+    request: PromptGenerationRequest,
+    parentCardId?: string
+  ): Promise<{ prompts: GeneratedPrompt[]; cards: CardCreationResult[] }> {
+    await this.trello.initialize();
+    const prompts = await this.promptGenerator.generateFromObjective(request);
+    const cards = await this.cardCreator.createFromPrompts(
+      prompts,
+      parentCardId
+    );
+    return { prompts, cards };
+  }
+
+  /**
+   * Generate prompts without creating cards (preview mode).
+   */
+  async generatePrompts(
+    request: PromptGenerationRequest
+  ): Promise<GeneratedPrompt[]> {
+    return this.promptGenerator.generateFromObjective(request);
   }
 
   /** Start the orchestrator - initialize Trello and begin polling */

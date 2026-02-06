@@ -121,3 +121,67 @@ export interface AgentDefinition {
   capabilities: string[];
   trelloLabelColor: string;
 }
+
+// ============================================================
+// Card Creation Types
+// ============================================================
+
+/** Request to create a new Trello card from an agent */
+export interface CardCreationRequest {
+  /** Title of the new card */
+  title: string;
+  /** Detailed description */
+  description: string;
+  /** Which workflow stage to place the card in */
+  stage: WorkflowStage;
+  /** Target domain/agent for the card */
+  targetDomain: AgentDomain;
+  /** Priority label */
+  priority: "low" | "medium" | "high" | "urgent";
+  /** Optional due date (ISO string) */
+  dueDate?: string;
+  /** Optional checklist items */
+  checklist?: string[];
+  /** ID of the parent card that spawned this one */
+  parentCardId?: string;
+}
+
+/** Result after creating a card */
+export interface CardCreationResult {
+  cardId: string;
+  cardUrl: string;
+  title: string;
+  targetDomain: AgentDomain;
+}
+
+// ============================================================
+// Prompt Generation Types
+// ============================================================
+
+/** A generated prompt/instruction set for an agent */
+export interface GeneratedPrompt {
+  /** Target agent domain */
+  targetDomain: AgentDomain;
+  /** Human-readable title */
+  title: string;
+  /** The full prompt/instructions for the target agent */
+  instructions: string;
+  /** Structured context to pass along */
+  context: Record<string, string>;
+  /** Expected deliverable type */
+  expectedDeliverable: DeliverableType;
+  /** Acceptance criteria */
+  acceptanceCriteria: string[];
+}
+
+/** Request to generate prompts for other agents */
+export interface PromptGenerationRequest {
+  /** High-level objective to decompose */
+  objective: string;
+  /** Additional context */
+  context?: Record<string, string>;
+  /** Which domains to target (if empty, auto-detect) */
+  targetDomains?: AgentDomain[];
+  /** The source task that triggered this generation */
+  sourceTask?: MarketingTask;
+}

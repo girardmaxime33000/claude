@@ -108,9 +108,8 @@ export interface AgentSystemConfig {
     repo: string;
   };
   umami?: {
-    serverUrl: string;
-    username: string;
-    password: string;
+    apiKey: string;
+    apiEndpoint?: string;
     websiteId: string;
     timezone?: string;
   };

@@ -1,5 +1,5 @@
 // ============================================================
-// Umami Analytics API Client
+// Umami Analytics API Client (Cloud API Key auth)
 // ============================================================
 
 import { UmamiApiClient } from "@umami/api-client";
@@ -14,34 +14,20 @@ import type {
   UmamiDateRange,
 } from "./types.js";
 
+const DEFAULT_API_ENDPOINT = "https://api.umami.is/v1";
+
 export class UmamiClient {
   private api: UmamiApiClient;
   private websiteId: string;
   private timezone: string;
-  private authenticated = false;
-  private username: string;
-  private password: string;
 
   constructor(config: UmamiConfig) {
     this.api = new UmamiApiClient({
-      apiEndpoint: config.serverUrl,
+      apiEndpoint: config.apiEndpoint ?? DEFAULT_API_ENDPOINT,
+      apiKey: config.apiKey,
     });
     this.websiteId = config.websiteId;
     this.timezone = config.timezone ?? "UTC";
-    this.username = config.username;
-    this.password = config.password;
-  }
-
-  /**
-   * Authenticate with the Umami server. Called automatically on first request.
-   */
-  private async ensureAuth(): Promise<void> {
-    if (this.authenticated) return;
-    const result = await this.api.login(this.username, this.password);
-    if (!result.ok) {
-      throw new Error(`Umami authentication failed: ${result.error ?? result.status}`);
-    }
-    this.authenticated = true;
   }
 
   /**
@@ -49,7 +35,6 @@ export class UmamiClient {
    * with comparison to previous period.
    */
   async getStats(range: UmamiDateRange): Promise<UmamiStats> {
-    await this.ensureAuth();
     const result = await this.api.getWebsiteStats(this.websiteId, {
       startAt: range.startAt,
       endAt: range.endAt,
@@ -67,7 +52,6 @@ export class UmamiClient {
     range: UmamiDateRange,
     unit: "hour" | "day" | "month" | "year" = "day",
   ): Promise<UmamiPageviewsResponse> {
-    await this.ensureAuth();
     const result = await this.api.getWebsitePageviews(this.websiteId, {
       startAt: range.startAt,
       endAt: range.endAt,
@@ -88,7 +72,6 @@ export class UmamiClient {
     type: UmamiMetricType,
     limit = 10,
   ): Promise<UmamiMetric[]> {
-    await this.ensureAuth();
     const result = await this.api.getWebsiteMetrics(this.websiteId, {
       startAt: range.startAt,
       endAt: range.endAt,
@@ -108,7 +91,6 @@ export class UmamiClient {
     range: UmamiDateRange,
     unit: "hour" | "day" | "month" | "year" = "day",
   ): Promise<UmamiEventMetric[]> {
-    await this.ensureAuth();
     const result = await this.api.getEventMetrics(this.websiteId, {
       startAt: String(range.startAt),
       endAt: String(range.endAt),
@@ -125,7 +107,6 @@ export class UmamiClient {
    * Get current active visitors count.
    */
   async getActiveVisitors(): Promise<number> {
-    await this.ensureAuth();
     const result = await this.api.getWebsiteActive(this.websiteId);
     if (!result.ok) {
       throw new Error(`Failed to get active visitors: ${result.error ?? result.status}`);

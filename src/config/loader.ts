@@ -31,11 +31,10 @@ export function loadConfig(): AgentSystemConfig {
       owner: required("GITHUB_OWNER"),
       repo: required("GITHUB_REPO"),
     },
-    umami: process.env.UMAMI_SERVER_URL
+    umami: process.env.UMAMI_API_KEY
       ? {
-          serverUrl: required("UMAMI_SERVER_URL"),
-          username: required("UMAMI_USERNAME"),
-          password: required("UMAMI_PASSWORD"),
+          apiKey: required("UMAMI_API_KEY"),
+          apiEndpoint: process.env.UMAMI_API_ENDPOINT,
           websiteId: required("UMAMI_WEBSITE_ID"),
           timezone: process.env.UMAMI_TIMEZONE,
         }

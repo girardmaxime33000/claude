@@ -5,12 +5,10 @@
 // ----- Umami Auth / Config -----
 
 export interface UmamiConfig {
-  /** Umami server URL (e.g. "https://analytics.example.com") */
-  serverUrl: string;
-  /** Username for authentication */
-  username: string;
-  /** Password for authentication */
-  password: string;
+  /** Umami Cloud API key (header x-umami-api-key) */
+  apiKey: string;
+  /** API endpoint (default: "https://api.umami.is/v1") */
+  apiEndpoint?: string;
   /** Website ID to query */
   websiteId: string;
   /** Timezone for date-based queries (default: "UTC") */

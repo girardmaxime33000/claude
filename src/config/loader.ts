@@ -31,6 +31,14 @@ export function loadConfig(): AgentSystemConfig {
       owner: required("GITHUB_OWNER"),
       repo: required("GITHUB_REPO"),
     },
+    umami: process.env.UMAMI_API_KEY
+      ? {
+          apiKey: required("UMAMI_API_KEY"),
+          apiEndpoint: process.env.UMAMI_API_ENDPOINT,
+          websiteId: required("UMAMI_WEBSITE_ID"),
+          timezone: process.env.UMAMI_TIMEZONE,
+        }
+      : undefined,
     pollIntervalMs: parseInt(optional("POLL_INTERVAL_MS", "30000"), 10),
     maxConcurrentAgents: parseInt(optional("MAX_CONCURRENT_AGENTS", "3"), 10),
     autoAssign: optional("AUTO_ASSIGN", "true") === "true",

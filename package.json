@@ -19,6 +19,7 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@umami/api-client": "^0.80.0",
     "dotenv": "^17.2.4"
   },
   "devDependencies": {

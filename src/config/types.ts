@@ -107,6 +107,12 @@ export interface AgentSystemConfig {
     owner: string;
     repo: string;
   };
+  umami?: {
+    apiKey: string;
+    apiEndpoint?: string;
+    websiteId: string;
+    timezone?: string;
+  };
   pollIntervalMs: number;
   maxConcurrentAgents: number;
   autoAssign: boolean;

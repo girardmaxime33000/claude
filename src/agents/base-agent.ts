@@ -1,21 +1,43 @@
 import type {
   AgentDefinition,
   AgentResult,
+  CardCreationRequest,
+  CardCreationResult,
   Deliverable,
+  GeneratedPrompt,
   MarketingTask,
 } from "../config/types.js";
+import type { PromptGenerator } from "../prompts/generator.js";
+import type { CardCreator } from "../trello/card-creator.js";
 
 /**
  * Base class for all marketing agents.
  * Each agent uses Claude to process tasks within their domain of expertise.
+ *
+ * Agents can:
+ * - Execute tasks and produce deliverables
+ * - Create Trello cards to delegate sub-tasks to other agents
+ * - Generate prompts/instructions for other agents
  */
 export class MarketingAgent {
   definition: AgentDefinition;
   private anthropicApiKey: string;
+  private promptGenerator: PromptGenerator | null = null;
+  private cardCreator: CardCreator | null = null;
 
   constructor(definition: AgentDefinition, anthropicApiKey: string) {
     this.definition = definition;
     this.anthropicApiKey = anthropicApiKey;
+  }
+
+  /** Inject the prompt generator (set by orchestrator) */
+  setPromptGenerator(generator: PromptGenerator): void {
+    this.promptGenerator = generator;
+  }
+
+  /** Inject the card creator (set by orchestrator) */
+  setCardCreator(creator: CardCreator): void {
+    this.cardCreator = creator;
   }
 
   /** Execute a marketing task and return the result */
@@ -28,14 +50,76 @@ export class MarketingAgent {
     const response = await this.callClaude(prompt);
     const deliverable = this.parseDeliverable(task, response);
 
+    // Check if the agent wants to delegate sub-tasks
+    const delegations = this.extractDelegations(response);
+    let createdCards: CardCreationResult[] = [];
+    if (delegations.length > 0 && this.cardCreator) {
+      createdCards = await this.createDelegatedCards(delegations, task.trelloCardId);
+    }
+
+    const summary = this.extractSummary(response);
+    const delegationNote = createdCards.length > 0
+      ? `\n\n📋 ${createdCards.length} sous-tâche(s) créée(s) : ${createdCards.map((c) => c.title).join(", ")}`
+      : "";
+
     return {
       taskId: task.id,
       domain: this.definition.domain,
       status: task.deliverableType === "review_request" ? "needs_review" : "success",
       deliverable,
-      summary: this.extractSummary(response),
-      trelloComment: this.buildTrelloComment(task, deliverable),
+      summary: summary + delegationNote,
+      trelloComment: this.buildTrelloComment(task, deliverable, createdCards),
     };
+  }
+
+  /**
+   * Generate prompts and create Trello cards for other agents.
+   * Can be called directly (not just during task execution).
+   */
+  async delegateToAgents(
+    objective: string,
+    context?: Record<string, string>,
+    parentCardId?: string
+  ): Promise<CardCreationResult[]> {
+    if (!this.promptGenerator || !this.cardCreator) {
+      throw new Error(
+        "Agent not fully initialized: promptGenerator and cardCreator are required for delegation"
+      );
+    }
+
+    console.log(
+      `[${this.definition.name}] Generating sub-tasks for: ${objective}`
+    );
+
+    const prompts = await this.promptGenerator.generateFromObjective({
+      objective,
+      context,
+    });
+
+    console.log(
+      `[${this.definition.name}] Generated ${prompts.length} prompts, creating cards...`
+    );
+
+    return this.cardCreator.createFromPrompts(prompts, parentCardId);
+  }
+
+  /**
+   * Generate a prompt for a specific agent without creating a card.
+   * Useful for preview/review before creation.
+   */
+  async generatePromptForAgent(
+    targetDomain: string,
+    objective: string,
+    context?: Record<string, string>
+  ): Promise<GeneratedPrompt> {
+    if (!this.promptGenerator) {
+      throw new Error("Agent not initialized: promptGenerator required");
+    }
+    return this.promptGenerator.generateForAgent(
+      targetDomain as import("../config/types.js").AgentDomain,
+      objective,
+      context
+    );
   }
 
   /** Build the full prompt for Claude based on the task */
@@ -43,6 +127,22 @@ export class MarketingAgent {
     const contextBlock = Object.entries(task.context)
       .map(([k, v]) => `- **${k}**: ${v}`)
       .join("\n");
+
+    const delegationBlock = this.cardCreator
+      ? `
+
+## Délégation (optionnel)
+Si cette tâche nécessite l'intervention d'autres agents spécialisés, tu peux créer des sous-tâches.
+Pour chaque sous-tâche, ajoute un bloc :
+
+### DELEGATE
+- **domain**: <seo|content|ads|analytics|social|email|brand|strategy>
+- **title**: <titre de la sous-tâche>
+- **description**: <description détaillée avec instructions>
+- **priority**: <low|medium|high|urgent>
+### END_DELEGATE
+`
+      : "";
 
     return `# Tâche à réaliser
 
@@ -72,7 +172,61 @@ Le contenu complet du livrable.
 
 ### NEXT_STEPS
 Les prochaines étapes recommandées (liste à puces).
-`;
+${delegationBlock}`;
+  }
+
+  /** Extract delegation requests from Claude's response */
+  private extractDelegations(
+    response: string
+  ): CardCreationRequest[] {
+    const delegations: CardCreationRequest[] = [];
+    const regex = /### DELEGATE\n([\s\S]*?)### END_DELEGATE/g;
+    let match;
+
+    while ((match = regex.exec(response)) !== null) {
+      const block = match[1];
+      const domain = this.extractInlineField(block, "domain");
+      const title = this.extractInlineField(block, "title");
+      const description = this.extractInlineField(block, "description");
+      const priority = this.extractInlineField(block, "priority") as
+        | "low"
+        | "medium"
+        | "high"
+        | "urgent";
+
+      if (domain && title && description) {
+        delegations.push({
+          title,
+          description,
+          stage: "todo",
+          targetDomain: domain as import("../config/types.js").AgentDomain,
+          priority: priority || "medium",
+        });
+      }
+    }
+
+    return delegations;
+  }
+
+  /** Create Trello cards for delegated sub-tasks */
+  private async createDelegatedCards(
+    delegations: CardCreationRequest[],
+    parentCardId: string
+  ): Promise<CardCreationResult[]> {
+    if (!this.cardCreator) return [];
+
+    const results: CardCreationResult[] = [];
+    for (const delegation of delegations) {
+      delegation.parentCardId = parentCardId;
+      const result = await this.cardCreator.createFromRequest(delegation);
+      results.push(result);
+    }
+    return results;
+  }
+
+  private extractInlineField(text: string, field: string): string {
+    const regex = new RegExp(`\\*\\*${field}\\*\\*:\\s*(.+)`, "i");
+    return regex.exec(text)?.[1]?.trim() ?? "";
   }
 
   /** Call the Claude API */
@@ -153,14 +307,20 @@ Les prochaines étapes recommandées (liste à puces).
 
   private buildTrelloComment(
     task: MarketingTask,
-    deliverable: Deliverable
+    deliverable: Deliverable,
+    createdCards: CardCreationResult[] = []
   ): string {
+    const delegationBlock =
+      createdCards.length > 0
+        ? `\n\n📋 **Sous-tâches créées** :\n${createdCards.map((c) => `- [${c.title}](${c.cardUrl}) → ${c.targetDomain}`).join("\n")}`
+        : "";
+
     return `🤖 **${this.definition.name}** a terminé cette tâche.
 
 **Livrable** : ${deliverable.title}
 **Type** : ${deliverable.type}
 **Emplacement** : \`${deliverable.location}\`
-
+${delegationBlock}
 ---
 *Traité automatiquement le ${new Date().toLocaleDateString("fr-FR")}*`;
   }

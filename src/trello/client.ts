@@ -20,6 +20,7 @@ export class TrelloClient {
   private boardId: string;
   private listCache: Map<string, TrelloList> = new Map();
   private stageToListId: Map<WorkflowStage, string> = new Map();
+  private labelCache: Map<string, TrelloLabel> = new Map();
 
   constructor(apiKey: string, token: string, boardId: string) {
     this.apiKey = apiKey;
@@ -56,7 +57,7 @@ export class TrelloClient {
     return response.json() as Promise<T>;
   }
 
-  /** Initialize list cache and stage mapping */
+  /** Initialize list cache, stage mapping, and label cache */
   async initialize(): Promise<void> {
     const lists = await this.request<TrelloList[]>(
       `/boards/${this.boardId}/lists`
@@ -72,6 +73,31 @@ export class TrelloClient {
         this.stageToListId.set(stage, list.id);
       }
     }
+
+    // Cache board labels
+    const labels = await this.request<TrelloLabel[]>(
+      `/boards/${this.boardId}/labels`
+    );
+    this.labelCache.clear();
+    for (const label of labels) {
+      if (label.name) {
+        this.labelCache.set(label.name.toLowerCase(), label);
+      }
+      this.labelCache.set(label.id, label);
+    }
+  }
+
+  /** Find a label ID by name (case-insensitive) or color */
+  findLabelId(nameOrColor: string): string | undefined {
+    const key = nameOrColor.toLowerCase();
+    const byName = this.labelCache.get(key);
+    if (byName) return byName.id;
+
+    // Try matching by color
+    for (const label of this.labelCache.values()) {
+      if (label.color === key) return label.id;
+    }
+    return undefined;
   }
 
   /** Map a Trello list name to a workflow stage */
@@ -272,16 +298,24 @@ export class TrelloClient {
     listStage: WorkflowStage,
     name: string,
     desc: string,
-    labelIds?: string[]
+    options?: {
+      labelIds?: string[];
+      dueDate?: string;
+    }
   ): Promise<TrelloCard> {
     const listId = this.stageToListId.get(listStage);
     if (!listId) throw new Error(`No list for stage ${listStage}`);
 
-    return this.request<TrelloCard>("/cards", "POST", {
+    const body: Record<string, unknown> = {
       idList: listId,
       name,
       desc,
-      idLabels: labelIds ?? [],
-    });
+      idLabels: options?.labelIds ?? [],
+    };
+    if (options?.dueDate) {
+      body.due = options.dueDate;
+    }
+
+    return this.request<TrelloCard>("/cards", "POST", body);
   }
 }

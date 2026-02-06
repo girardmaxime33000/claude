@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { loadConfig } from "./config/loader.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
 

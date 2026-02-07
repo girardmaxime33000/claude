@@ -3,18 +3,13 @@ import { loadConfig } from "./config/loader.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
 import { AGENT_DEFINITIONS } from "./config/agents.js";
 import type { AgentDomain, WorkflowStage } from "./config/types.js";
+import { validateDomain, validateStage, validatePriority } from "./utils/validator.js";
 
 /**
  * CLI for interacting with the AI Marketing Agents system.
  *
- * Commands:
- *   run <cardId>                         - Run a single task by Trello card ID
- *   poll                                 - Run one poll cycle (fetch + process tasks)
- *   status                               - Show registered agents and their capabilities
- *   agents                               - List all available agents
- *   create-card <title> [options]         - Create a Trello card
- *   generate <objective>                  - Generate prompts & create cards from objective
- *   preview <objective>                   - Preview generated prompts (no card creation)
+ * SECURITY patches applied:
+ * - MOYENNE-02: All CLI inputs are validated against allowed values
  */
 async function cli() {
   const [command, ...args] = process.argv.slice(2);
@@ -24,6 +19,11 @@ async function cli() {
       const cardId = args[0];
       if (!cardId) {
         console.error("Usage: agent:run <trello-card-id>");
+        process.exit(1);
+      }
+      // Basic card ID validation (alphanumeric only)
+      if (!/^[a-zA-Z0-9]+$/.test(cardId)) {
+        console.error("Error: Invalid card ID format. Expected alphanumeric characters only.");
         process.exit(1);
       }
       const config = loadConfig();
@@ -82,10 +82,21 @@ async function cli() {
       }
 
       const flags = parseFlags(args.slice(1));
-      const domain = (flags.domain ?? "strategy") as AgentDomain;
+
+      // MOYENNE-02: Validate all inputs against allowed values
+      let domain: AgentDomain = "strategy";
+      let priority: "low" | "medium" | "high" | "urgent" = "medium";
+      let stage: WorkflowStage = "todo";
+      try {
+        domain = validateDomain(flags.domain ?? "strategy");
+        priority = validatePriority(flags.priority ?? "medium");
+        stage = validateStage(flags.stage ?? "todo");
+      } catch (err) {
+        console.error(`Validation error: ${err instanceof Error ? err.message : err}`);
+        process.exit(1);
+      }
+
       const description = flags.desc ?? flags.description ?? "";
-      const priority = (flags.priority ?? "medium") as "low" | "medium" | "high" | "urgent";
-      const stage = (flags.stage ?? "todo") as WorkflowStage;
 
       const config = loadConfig();
       const orchestrator = new Orchestrator(config);
@@ -184,6 +195,7 @@ Usage:
 
 Card creation options:
   --domain <domain>     Target agent domain (default: strategy)
+                        Valid: seo, content, ads, analytics, social, email, brand, strategy
   --desc <description>  Card description
   --priority <level>    low | medium | high | urgent (default: medium)
   --stage <stage>       backlog | todo | in_progress | review | done (default: todo)
@@ -215,6 +227,6 @@ function parseFlags(args: string[]): Record<string, string> {
 }
 
 cli().catch((err) => {
-  console.error("CLI error:", err);
+  console.error("CLI error:", err instanceof Error ? err.message : err);
   process.exit(1);
 });

@@ -5,14 +5,22 @@ import type {
   DeliverableType,
 } from "../config/types.js";
 import { AGENT_DEFINITIONS, AGENT_MAP } from "../config/agents.js";
+import { secureFetchOk, RateLimiter } from "../utils/http.js";
+import { isValidDomain, isValidDeliverableType } from "../utils/validator.js";
+
+/**
+ * Shared rate limiter for Claude API calls from the prompt generator.
+ */
+const claudeRateLimiter = new RateLimiter(5, 2);
 
 /**
  * Generates structured prompts and instructions that one agent
  * can use to delegate work to other agents via Trello cards.
  *
- * Two modes:
- * 1. AI-assisted: calls Claude to decompose an objective into sub-tasks
- * 2. Template-based: uses predefined templates for common patterns
+ * SECURITY patches applied:
+ * - HAUTE-02: Rate limiting on Claude API calls
+ * - HAUTE-05: Timeouts on all HTTP requests
+ * - MOYENNE-04: Domain validation in parsed responses
  */
 export class PromptGenerator {
   private anthropicApiKey: string;
@@ -21,10 +29,6 @@ export class PromptGenerator {
     this.anthropicApiKey = anthropicApiKey;
   }
 
-  /**
-   * Generate prompts for other agents by decomposing a high-level objective.
-   * Uses Claude to analyze the objective and produce structured instructions.
-   */
   async generateFromObjective(
     request: PromptGenerationRequest
   ): Promise<GeneratedPrompt[]> {
@@ -86,10 +90,6 @@ Génère uniquement les tâches pertinentes. Sois précis et actionnable.`;
     return this.parseGeneratedPrompts(response);
   }
 
-  /**
-   * Generate a single prompt for a specific agent domain.
-   * Useful when you know exactly which agent should handle a task.
-   */
   async generateForAgent(
     domain: AgentDomain,
     objective: string,
@@ -138,10 +138,6 @@ ACCEPTANCE_CRITERIA:
     return this.parseSinglePrompt(domain, response);
   }
 
-  /**
-   * Build a prompt from a template without calling Claude.
-   * Fast, deterministic, and free.
-   */
   buildFromTemplate(
     domain: AgentDomain,
     template: PromptTemplate,
@@ -155,7 +151,6 @@ ACCEPTANCE_CRITERIA:
     let instructions = PROMPT_TEMPLATES[template] ?? template;
     let title = template.replace(/_/g, " ");
 
-    // Replace variables
     for (const [key, value] of Object.entries(variables)) {
       instructions = instructions.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), value);
       title = title.replace(new RegExp(`\\{\\{${key}\\}\\}`, "g"), value);
@@ -171,7 +166,6 @@ ACCEPTANCE_CRITERIA:
     };
   }
 
-  /** Detect which agent domains are relevant for an objective */
   private detectRelevantDomains(objective: string): AgentDomain[] {
     const text = objective.toLowerCase();
     const domains: AgentDomain[] = [];
@@ -193,7 +187,6 @@ ACCEPTANCE_CRITERIA:
       }
     }
 
-    // Always include strategy if nothing else matches or for broad objectives
     if (domains.length === 0) {
       domains.push("strategy");
     }
@@ -201,7 +194,10 @@ ACCEPTANCE_CRITERIA:
     return domains;
   }
 
-  /** Parse Claude's multi-task response into GeneratedPrompt[] */
+  /**
+   * Parse Claude's multi-task response into GeneratedPrompt[].
+   * SECURITY: Validates domains and deliverable types (MOYENNE-04).
+   */
   private parseGeneratedPrompts(response: string): GeneratedPrompt[] {
     const prompts: GeneratedPrompt[] = [];
     const taskBlocks = response.split("---TASK_START---").slice(1);
@@ -209,16 +205,27 @@ ACCEPTANCE_CRITERIA:
     for (const block of taskBlocks) {
       const content = block.split("---TASK_END---")[0] ?? block;
 
-      const domain = this.extractField(content, "TARGET_DOMAIN") as AgentDomain;
+      const rawDomain = this.extractField(content, "TARGET_DOMAIN");
       const title = this.extractField(content, "TITLE");
-      const deliverableType = this.extractField(content, "DELIVERABLE_TYPE") as DeliverableType;
+      const rawDeliverableType = this.extractField(content, "DELIVERABLE_TYPE");
       const instructions = this.extractMultilineField(content, "INSTRUCTIONS");
       const contextLines = this.extractMultilineField(content, "CONTEXT_KEY_VALUES");
       const criteriaText = this.extractMultilineField(content, "ACCEPTANCE_CRITERIA");
 
-      if (!domain || !title) continue;
+      if (!title) continue;
 
-      // Parse context key-values
+      // MOYENNE-04: Validate domain
+      if (!isValidDomain(rawDomain)) {
+        console.warn(`[security] Invalid domain "${rawDomain}" in generated prompt, skipping.`);
+        continue;
+      }
+      const domain = rawDomain;
+
+      // Validate deliverable type with fallback
+      const deliverableType: DeliverableType = isValidDeliverableType(rawDeliverableType)
+        ? rawDeliverableType
+        : "document";
+
       const context: Record<string, string> = {};
       for (const line of contextLines.split("\n")) {
         const match = /^([^:]+):\s*(.+)$/.exec(line.trim());
@@ -227,7 +234,6 @@ ACCEPTANCE_CRITERIA:
         }
       }
 
-      // Parse acceptance criteria
       const acceptanceCriteria = criteriaText
         .split("\n")
         .map((line) => line.replace(/^-\s*/, "").trim())
@@ -238,7 +244,7 @@ ACCEPTANCE_CRITERIA:
         title,
         instructions,
         context,
-        expectedDeliverable: deliverableType || "document",
+        expectedDeliverable: deliverableType,
         acceptanceCriteria,
       });
     }
@@ -246,15 +252,18 @@ ACCEPTANCE_CRITERIA:
     return prompts;
   }
 
-  /** Parse a single-agent response */
   private parseSinglePrompt(
     domain: AgentDomain,
     response: string
   ): GeneratedPrompt {
     const title = this.extractField(response, "TITLE") || "Tâche générée";
-    const deliverableType = this.extractField(response, "DELIVERABLE_TYPE") as DeliverableType;
+    const rawDeliverableType = this.extractField(response, "DELIVERABLE_TYPE");
     const instructions = this.extractMultilineField(response, "INSTRUCTIONS");
     const criteriaText = this.extractMultilineField(response, "ACCEPTANCE_CRITERIA");
+
+    const deliverableType: DeliverableType = isValidDeliverableType(rawDeliverableType)
+      ? rawDeliverableType
+      : "document";
 
     const acceptanceCriteria = criteriaText
       .split("\n")
@@ -266,7 +275,7 @@ ACCEPTANCE_CRITERIA:
       title,
       instructions: instructions || response,
       context: {},
-      expectedDeliverable: deliverableType || "document",
+      expectedDeliverable: deliverableType,
       acceptanceCriteria,
     };
   }
@@ -284,27 +293,32 @@ ACCEPTANCE_CRITERIA:
     return regex.exec(text)?.[1]?.trim() ?? "";
   }
 
+  /**
+   * Call Claude API with rate limiting and timeout.
+   * SECURITY: Rate-limited (HAUTE-02), timeout enforced (HAUTE-05).
+   */
   private async callClaude(prompt: string): Promise<string> {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": this.anthropicApiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify({
-        model: "claude-sonnet-4-20250514",
-        max_tokens: 4096,
-        system:
-          "Tu es un chef de projet marketing IA expert. Tu décomposes des objectifs en tâches précises et actionnables pour des agents spécialisés.",
-        messages: [{ role: "user", content: prompt }],
-      }),
-    });
+    await claudeRateLimiter.acquire();
 
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`Claude API error: ${response.status} - ${error}`);
-    }
+    const response = await secureFetchOk(
+      "https://api.anthropic.com/v1/messages",
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.anthropicApiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: "claude-sonnet-4-20250514",
+          max_tokens: 4096,
+          system:
+            "Tu es un chef de projet marketing IA expert. Tu décomposes des objectifs en tâches précises et actionnables pour des agents spécialisés.",
+          messages: [{ role: "user", content: prompt }],
+        }),
+        timeoutMs: 120_000,
+      }
+    );
 
     const data = (await response.json()) as {
       content: Array<{ type: string; text: string }>;

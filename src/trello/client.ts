@@ -7,12 +7,17 @@ import type {
   AgentDomain,
   DeliverableType,
 } from "../config/types.js";
+import { secureFetchOk, sanitizeUrl } from "../utils/http.js";
 
 const TRELLO_API = "https://api.trello.com/1";
 
 /**
  * Trello API client for managing marketing task boards.
- * Handles reading cards, moving between lists, adding comments, etc.
+ *
+ * SECURITY patches applied:
+ * - CRITIQUE-03: URL sanitization in error messages and logs
+ * - HAUTE-05: All requests have timeouts via secureFetchOk()
+ * - HAUTE-01: Error messages never leak credentials
  */
 export class TrelloClient {
   private apiKey: string;
@@ -32,6 +37,10 @@ export class TrelloClient {
     return `key=${this.apiKey}&token=${this.token}`;
   }
 
+  /**
+   * Make an authenticated Trello API request.
+   * SECURITY: Timeout enforced, credentials stripped from error messages.
+   */
   private async request<T>(
     path: string,
     method: string = "GET",
@@ -40,21 +49,25 @@ export class TrelloClient {
     const separator = path.includes("?") ? "&" : "?";
     const url = `${TRELLO_API}${path}${separator}${this.authParams()}`;
 
-    const options: RequestInit = {
+    const options: RequestInit & { timeoutMs?: number } = {
       method,
       headers: { "Content-Type": "application/json" },
+      timeoutMs: 30_000,
     };
     if (body) {
       options.body = JSON.stringify(body);
     }
 
-    const response = await fetch(url, options);
-    if (!response.ok) {
+    try {
+      const response = await secureFetchOk(url, options);
+      return response.json() as Promise<T>;
+    } catch (error) {
+      // CRITIQUE-03: Never leak credentials in error messages
+      const safeMsg = error instanceof Error ? error.message : String(error);
       throw new Error(
-        `Trello API error: ${response.status} ${response.statusText} on ${method} ${path}`
+        `Trello API error on ${method} ${path}: ${safeMsg.replace(this.apiKey, "***").replace(this.token, "***")}`
       );
     }
-    return response.json() as Promise<T>;
   }
 
   /** Initialize list cache, stage mapping, and label cache */
@@ -74,7 +87,6 @@ export class TrelloClient {
       }
     }
 
-    // Cache board labels
     const labels = await this.request<TrelloLabel[]>(
       `/boards/${this.boardId}/labels`
     );
@@ -93,14 +105,12 @@ export class TrelloClient {
     const byName = this.labelCache.get(key);
     if (byName) return byName.id;
 
-    // Try matching by color
     for (const label of this.labelCache.values()) {
       if (label.color === key) return label.id;
     }
     return undefined;
   }
 
-  /** Map a Trello list name to a workflow stage */
   private listNameToStage(name: string): WorkflowStage | null {
     const normalized = name.toLowerCase().trim();
     const mapping: Record<string, WorkflowStage> = {
@@ -121,12 +131,10 @@ export class TrelloClient {
     return mapping[normalized] ?? null;
   }
 
-  /** Get list ID for a workflow stage */
   getListId(stage: WorkflowStage): string | undefined {
     return this.stageToListId.get(stage);
   }
 
-  /** Get all cards in the "todo" list (available for agents to pick up) */
   async getAvailableTasks(): Promise<TrelloCard[]> {
     const todoListId = this.stageToListId.get("todo");
     if (!todoListId) {
@@ -137,14 +145,12 @@ export class TrelloClient {
     );
   }
 
-  /** Get all cards on the board */
   async getAllCards(): Promise<TrelloCard[]> {
     return this.request<TrelloCard[]>(
       `/boards/${this.boardId}/cards?fields=id,name,desc,idList,labels,due,idMembers,url`
     );
   }
 
-  /** Move a card to a different workflow stage */
   async moveCard(cardId: string, stage: WorkflowStage): Promise<void> {
     const listId = this.stageToListId.get(stage);
     if (!listId) {
@@ -153,14 +159,10 @@ export class TrelloClient {
     await this.request(`/cards/${cardId}`, "PUT", { idList: listId });
   }
 
-  /** Add a comment to a card */
   async addComment(cardId: string, text: string): Promise<void> {
-    await this.request(`/cards/${cardId}/actions/comments`, "POST", {
-      text,
-    });
+    await this.request(`/cards/${cardId}/actions/comments`, "POST", { text });
   }
 
-  /** Add a checklist to a card */
   async addChecklist(
     cardId: string,
     name: string,
@@ -178,12 +180,10 @@ export class TrelloClient {
     }
   }
 
-  /** Update card description */
   async updateDescription(cardId: string, desc: string): Promise<void> {
     await this.request(`/cards/${cardId}`, "PUT", { desc });
   }
 
-  /** Parse a Trello card into an internal MarketingTask */
   parseCard(card: TrelloCard): MarketingTask {
     const domain = this.detectDomain(card);
     const stage = this.detectStage(card.idList);
@@ -206,7 +206,6 @@ export class TrelloClient {
     };
   }
 
-  /** Detect domain from card labels */
   private detectDomain(card: TrelloCard): AgentDomain {
     const labelMap: Record<string, AgentDomain> = {
       seo: "seo",
@@ -235,13 +234,12 @@ export class TrelloClient {
       if (labelMap[key]) return labelMap[key];
     }
 
-    // Fallback: detect from card name/description
     const text = `${card.name} ${card.desc}`.toLowerCase();
     for (const [keyword, domain] of Object.entries(labelMap)) {
       if (text.includes(keyword)) return domain;
     }
 
-    return "strategy"; // default
+    return "strategy";
   }
 
   private detectStage(listId: string): WorkflowStage {
@@ -259,7 +257,6 @@ export class TrelloClient {
       if (name.includes("high") || name.includes("prioritaire")) return "high";
       if (name.includes("low") || name.includes("bas")) return "low";
     }
-    // If has a due date soon, increase priority
     if (card.due) {
       const daysUntilDue =
         (new Date(card.due).getTime() - Date.now()) / (1000 * 60 * 60 * 24);
@@ -284,7 +281,6 @@ export class TrelloClient {
 
   private extractContext(card: TrelloCard): Record<string, string> {
     const context: Record<string, string> = {};
-    // Extract key-value pairs from description (format: **Key**: Value)
     const regex = /\*\*([^*]+)\*\*\s*:\s*(.+)/g;
     let match;
     while ((match = regex.exec(card.desc)) !== null) {
@@ -293,7 +289,6 @@ export class TrelloClient {
     return context;
   }
 
-  /** Create a new card on the board */
   async createCard(
     listStage: WorkflowStage,
     name: string,

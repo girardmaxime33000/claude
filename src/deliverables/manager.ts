@@ -1,6 +1,8 @@
 import { writeFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import type { Deliverable } from "../config/types.js";
+import { safePath, safeSlug } from "../utils/sanitizer.js";
+import { secureFetchOk } from "../utils/http.js";
 
 interface GitHubConfig {
   token: string;
@@ -11,6 +13,11 @@ interface GitHubConfig {
 /**
  * Manages the production of deliverables from agent results.
  * Supports: local documents, GitHub PRs, review requests.
+ *
+ * SECURITY patches applied:
+ * - CRITIQUE-02: Path traversal protection via safePath()
+ * - HAUTE-04: All GitHub API responses are verified
+ * - HAUTE-05: All HTTP requests have timeouts via secureFetchOk()
  */
 export class DeliverableManager {
   private github: GitHubConfig;
@@ -18,7 +25,7 @@ export class DeliverableManager {
 
   constructor(github: GitHubConfig, outputDir: string = "./output") {
     this.github = github;
-    this.outputDir = outputDir;
+    this.outputDir = resolve(outputDir);
   }
 
   /** Produce a deliverable and return its URL/path */
@@ -38,9 +45,12 @@ export class DeliverableManager {
     }
   }
 
-  /** Write a document/report to the local filesystem */
+  /**
+   * Write a document/report to the local filesystem.
+   * SECURITY: Path traversal protection (CRITIQUE-02).
+   */
   private async writeDocument(deliverable: Deliverable): Promise<string> {
-    const filePath = resolve(this.outputDir, deliverable.location);
+    const filePath = safePath(this.outputDir, deliverable.location);
     await mkdir(dirname(filePath), { recursive: true });
 
     const header = `# ${deliverable.title}
@@ -56,32 +66,35 @@ export class DeliverableManager {
     return filePath;
   }
 
-  /** Create a GitHub Pull Request with the deliverable content */
+  /**
+   * Create a GitHub Pull Request with the deliverable content.
+   * SECURITY: All responses verified (HAUTE-04), timeouts enforced (HAUTE-05).
+   */
   private async createPullRequest(deliverable: Deliverable): Promise<string> {
     const branchName = deliverable.location; // e.g., "feature/seo-audit"
     const { owner, repo, token } = this.github;
     const apiBase = `https://api.github.com/repos/${owner}/${repo}`;
 
-    const headers = {
+    const headers: Record<string, string> = {
       Authorization: `Bearer ${token}`,
       Accept: "application/vnd.github.v3+json",
       "Content-Type": "application/json",
     };
 
-    // 1. Get default branch ref
-    const repoRes = await fetch(apiBase, { headers });
+    // 1. Get default branch ref (HAUTE-04: response verified)
+    const repoRes = await secureFetchOk(apiBase, { headers });
     const repoData = (await repoRes.json()) as { default_branch: string };
     const defaultBranch = repoData.default_branch;
 
-    const refRes = await fetch(
+    const refRes = await secureFetchOk(
       `${apiBase}/git/ref/heads/${defaultBranch}`,
       { headers }
     );
     const refData = (await refRes.json()) as { object: { sha: string } };
     const baseSha = refData.object.sha;
 
-    // 2. Create branch
-    await fetch(`${apiBase}/git/refs`, {
+    // 2. Create branch (HAUTE-04: response verified)
+    await secureFetchOk(`${apiBase}/git/refs`, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -90,11 +103,12 @@ export class DeliverableManager {
       }),
     });
 
-    // 3. Create/update file on the branch
-    const filePath = `deliverables/${deliverable.metadata.domain}/${deliverable.title.toLowerCase().replace(/[^a-z0-9]+/g, "-")}.md`;
+    // 3. Create/update file on the branch (HAUTE-04: response verified)
+    const slug = safeSlug(deliverable.title);
+    const filePath = `deliverables/${deliverable.metadata.domain}/${slug}.md`;
     const content = Buffer.from(deliverable.content).toString("base64");
 
-    await fetch(`${apiBase}/contents/${filePath}`, {
+    await secureFetchOk(`${apiBase}/contents/${filePath}`, {
       method: "PUT",
       headers,
       body: JSON.stringify({
@@ -104,8 +118,8 @@ export class DeliverableManager {
       }),
     });
 
-    // 4. Create Pull Request
-    const prRes = await fetch(`${apiBase}/pulls`, {
+    // 4. Create Pull Request (HAUTE-04: response verified)
+    const prRes = await secureFetchOk(`${apiBase}/pulls`, {
       method: "POST",
       headers,
       body: JSON.stringify({
@@ -132,7 +146,10 @@ ${deliverable.content.slice(0, 500)}...
     return prData.html_url;
   }
 
-  /** Create a review request (issue + assignment) */
+  /**
+   * Create a review request (issue + assignment).
+   * SECURITY: Response verified (HAUTE-04), path protected (CRITIQUE-02).
+   */
   private async createReviewRequest(
     deliverable: Deliverable
   ): Promise<string> {
@@ -141,8 +158,8 @@ ${deliverable.content.slice(0, 500)}...
     // First write the document locally
     const docPath = await this.writeDocument(deliverable);
 
-    // Then create a GitHub issue for review
-    const issueRes = await fetch(
+    // Then create a GitHub issue for review (HAUTE-04: response verified)
+    const issueRes = await secureFetchOk(
       `https://api.github.com/repos/${owner}/${repo}/issues`,
       {
         method: "POST",
@@ -174,11 +191,14 @@ ${deliverable.content.slice(0, 1000)}
     return issueData.html_url;
   }
 
-  /** Write a campaign configuration file (JSON) */
+  /**
+   * Write a campaign configuration file (JSON).
+   * SECURITY: Path traversal protection (CRITIQUE-02).
+   */
   private async writeCampaignConfig(
     deliverable: Deliverable
   ): Promise<string> {
-    const filePath = resolve(this.outputDir, deliverable.location);
+    const filePath = safePath(this.outputDir, deliverable.location);
     await mkdir(dirname(filePath), { recursive: true });
 
     // Try to parse content as JSON, otherwise wrap it

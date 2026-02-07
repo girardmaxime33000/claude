@@ -1,6 +1,20 @@
 # AI Marketing Agents
 
-Systeme multi-agents IA specialises en marketing, orchestre via Trello et propulse par Claude (Anthropic). Chaque agent possede une expertise metier distincte et produit des livrables actionables automatiquement.
+Systeme multi-agents IA specialise en marketing digital, orchestre via Trello et propulse par Claude (Anthropic). Chaque agent possede une expertise metier distincte et produit des livrables actionnables de maniere autonome.
+
+## Table des matieres
+
+- [Architecture](#architecture)
+- [Agents](#agents)
+- [Fonctionnalites](#fonctionnalites)
+- [Stack technique](#stack-technique)
+- [Structure du projet](#structure-du-projet)
+- [Prerequis](#prerequis)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Utilisation](#utilisation)
+- [Cas d'usage](#cas-dusage)
+- [Licence](#licence)
 
 ---
 
@@ -20,231 +34,150 @@ Trello Board                 Orchestrator                  Agents (x8)
                           │  PR / Issue  │               └──────────────┘
                           │  Fichiers    │
                           └──────────────┘
+
+                          ┌──────────────┐
+                          │  Umami       │  ◀── Analytics en temps reel
+                          │  Analytics   │
+                          └──────────────┘
 ```
 
----
-
-## Les 8 Agents
-
-### SEO Specialist
-
-| | |
-|---|---|
-| **Domaine** | `seo` |
-| **Role** | Expert SEO senior qui analyse mots-cles, audits techniques, optimisation on-page, backlinks et veille concurrentielle |
-| **Capacites** | `keyword_research` · `technical_audit` · `content_optimization` · `competitor_analysis` · `backlink_strategy` |
-| **Livrable type** | Document structure avec recommandations priorisees et metriques de suivi |
-
-**Instructions internes** : L'agent recoit un prompt systeme lui demandant de produire des analyses SEO actionnables, avec priorites claires et KPIs de tracking. Il structure ses reponses en sections (resume, livrable, prochaines etapes).
+**Flux de travail** : L'orchestrateur poll Trello toutes les 30 secondes, detecte les nouvelles cartes dans la liste "Todo", identifie le domaine via les labels et mots-cles, puis dispatche la tache a l'agent specialise. Le livrable est produit et pousse sur GitHub (PR/Issue) ou stocke localement. La carte Trello est deplacee automatiquement au fil du workflow.
 
 ---
 
-### Content Strategist
+## Agents
 
-| | |
-|---|---|
-| **Domaine** | `content` |
-| **Role** | Directeur de contenu concevant et executant des strategies editoriales |
-| **Capacites** | `editorial_calendar` · `content_writing` · `content_audit` · `tone_of_voice` · `content_repurposing` |
-| **Livrable type** | Contenus prets a publier ou strategies documentees avec planning, KPIs et guidelines |
+Le systeme embarque **8 agents specialises**, chacun associe a un domaine marketing et identifie par une couleur de label Trello :
 
-**Instructions internes** : L'agent produit des strategies de contenu completes ou des contenus directement publiables. Il inclut systematiquement un calendrier editorial, des recommandations de ton et des metriques de performance.
+| Agent | Domaine | Label Trello | Capacites |
+|-------|---------|:------------:|-----------|
+| **SEO Specialist** | `seo` | 🟢 vert | Recherche de mots-cles, audit technique, optimisation on-page, analyse concurrentielle, strategie de backlinks |
+| **Content Strategist** | `content` | 🔵 bleu | Calendrier editorial, redaction, audit de contenu, tone of voice, repurposing cross-canal |
+| **Paid Media** | `ads` | 🔴 rouge | Configuration de campagnes, copywriting publicitaire, optimisation budgetaire, ciblage d'audiences, reporting ROAS |
+| **Analytics** | `analytics` | 🟠 orange | Creation de dashboards, analyse de donnees, tracking de conversions, modelisation d'attribution, reporting |
+| **Social Media** | `social` | 🟣 violet | Strategie social media, community management, calendrier de publication, strategie d'influence, social listening |
+| **Email Marketing** | `email` | 🟡 jaune | Campagnes email, workflows d'automation, segmentation, A/B testing, deliverabilite |
+| **Brand Strategy** | `brand` | 🩵 ciel | Positionnement de marque, brand guidelines, analyse concurrentielle, messaging, audit de marque |
+| **Marketing Strategy** | `strategy` | ⚫ noir | Plan marketing, allocation budgetaire, etude de marche, strategie de croissance, definition d'OKRs |
 
----
-
-### Paid Media
-
-| | |
-|---|---|
-| **Domaine** | `ads` |
-| **Role** | Expert en acquisition digitale et media payant |
-| **Capacites** | `campaign_setup` · `ad_copywriting` · `budget_optimization` · `audience_targeting` · `performance_reporting` |
-| **Livrable type** | Configurations de campagnes, copies publicitaires, recommandations budgetaires, rapports de performance |
-
-**Instructions internes** : L'agent genere des configurations campagnes structurees (audiences, budgets, copies), des recommandations d'optimisation et des rapports de performance avec ROI.
+Chaque agent recoit un prompt systeme adapte a son expertise et produit des livrables structures (recommandations priorisees, metriques de suivi, documents prets a publier).
 
 ---
 
-### Analytics
+## Fonctionnalites
 
-| | |
-|---|---|
-| **Domaine** | `analytics` |
-| **Role** | Analyste marketing senior data-driven |
-| **Capacites** | `dashboard_creation` · `data_analysis` · `conversion_tracking` · `attribution_modeling` · `reporting` |
-| **Livrable type** | Rapports d'analyse, configurations de tracking, recommandations data-driven |
+### Routage intelligent
 
-**Instructions internes** : L'agent fournit des analyses quantitatives avec visualisations, configurations de tracking et recommandations basees sur les donnees. Il structure ses rapports avec metriques cles et interpretations.
-
----
-
-### Social Media
-
-| | |
-|---|---|
-| **Domaine** | `social` |
-| **Role** | Expert en marketing sur les reseaux sociaux |
-| **Capacites** | `social_strategy` · `community_management` · `social_calendar` · `influencer_strategy` · `social_listening` |
-| **Livrable type** | Strategies sociales, calendriers de publication, guidelines community management, rapports engagement |
-
-**Instructions internes** : L'agent elabore des strategies social media adaptees a chaque plateforme, avec calendriers de publication, guidelines de community management et metriques d'engagement.
-
----
-
-### Email Marketing
-
-| | |
-|---|---|
-| **Domaine** | `email` |
-| **Role** | Expert en email marketing et marketing automation |
-| **Capacites** | `email_campaigns` · `automation_workflows` · `segmentation` · `ab_testing` · `deliverability` |
-| **Livrable type** | Templates email, workflows d'automation, strategies de segmentation, rapports de performance |
-
-**Instructions internes** : L'agent concoit des campagnes email completes avec workflows d'automation, regles de segmentation, scenarios A/B et optimisations de deliverabilite.
-
----
-
-### Brand Strategy
-
-| | |
-|---|---|
-| **Domaine** | `brand` |
-| **Role** | Strategiste de marque senior |
-| **Capacites** | `brand_positioning` · `brand_guidelines` · `competitive_analysis` · `brand_messaging` · `brand_audit` |
-| **Livrable type** | Documents de strategie de marque, guidelines, analyses concurrentielles, recommandations de positionnement |
-
-**Instructions internes** : L'agent produit des strategies de marque structurees avec positionnement, messages cles, guidelines visuelles et analyses du paysage concurrentiel.
-
----
-
-### Marketing Strategy
-
-| | |
-|---|---|
-| **Domaine** | `strategy` |
-| **Role** | Directeur marketing strategique senior |
-| **Capacites** | `marketing_plan` · `budget_allocation` · `market_research` · `growth_strategy` · `okr_definition` |
-| **Livrable type** | Plans marketing structures, analyses de marche, recommandations strategiques, frameworks decisionnels |
-
-**Instructions internes** : L'agent elabore des plans marketing complets avec allocation budgetaire, etudes de marche, strategies de croissance et definition d'OKRs. Il fournit des frameworks decisionnels structures.
-
----
-
-## Features
-
-### Routage intelligent des taches
-
-L'orchestrateur detecte automatiquement le domaine d'une tache Trello en analysant :
-- Les **labels** de la carte (couleur et nom)
+L'orchestrateur detecte automatiquement le domaine d'une tache en analysant :
+- Les **labels** de la carte Trello (couleur et nom)
 - Les **mots-cles** dans le titre et la description
 - Le **type de livrable** attendu
 
-La tache est ensuite dispatchee a l'agent specialise correspondant.
-
 ### Gestion de priorite
 
-Les taches sont traitees par ordre de priorite : `urgent` > `high` > `medium` > `low`. La priorite est determinee par les labels Trello et les dates d'echeance.
+Les taches sont traitees par ordre : `urgent` > `high` > `medium` > `low`. La priorite est determinee par les labels Trello et les dates d'echeance.
 
 ### Execution concurrente
 
-Jusqu'a 3 agents peuvent s'executer en parallele (configurable via `MAX_CONCURRENT_AGENTS`). L'orchestrateur gere la file d'attente et respecte la limite de concurrence.
+Jusqu'a 3 agents en parallele (configurable via `MAX_CONCURRENT_AGENTS`). L'orchestrateur gere la file d'attente et respecte la limite de concurrence.
+
+### Generation de prompts inter-agents
+
+A partir d'un objectif marketing de haut niveau, le systeme decompose automatiquement la tache en sous-objectifs et genere des prompts specialises pour chaque agent concerne. Les cartes Trello correspondantes sont creees automatiquement.
 
 ### Livrables multi-formats
 
 | Type | Sortie | Description |
 |------|--------|-------------|
-| `document` | Fichier Markdown local | Document structure avec metadonnees |
-| `report` | Fichier Markdown local | Rapport d'analyse detaille |
+| `document` | Fichier Markdown | Document structure avec metadonnees |
+| `report` | Fichier Markdown | Rapport d'analyse detaille |
 | `pull_request` | Pull Request GitHub | Branche + commit + PR formatee |
 | `review_request` | Issue GitHub | Issue avec label "review" |
-| `campaign_config` | Fichier JSON local | Configuration de campagne structuree |
+| `campaign_config` | Fichier JSON | Configuration de campagne structuree |
 
-### Workflow Trello complet
+### Workflow Trello
 
-Chaque tache suit le cycle : **Backlog** → **Todo** → **In Progress** → **Review** → **Done**. L'orchestrateur deplace les cartes, ajoute des commentaires avec les resultats et cree des checklists pour les prochaines etapes.
+Cycle complet : **Backlog** → **Todo** → **In Progress** → **Review** → **Done**. L'orchestrateur deplace les cartes, ajoute des commentaires avec les resultats et cree des checklists pour les prochaines etapes. Support bilingue (FR/EN) pour les noms de listes.
 
-### Integration GitHub
+### Analytics (Umami)
 
-Creation automatique de Pull Requests et d'Issues pour les livrables qui necessitent une revue humaine ou une integration dans le code.
-
-### Support bilingue
-
-Les noms de listes Trello sont reconnus en francais et en anglais (`A faire` / `Todo`, `En cours` / `In Progress`, etc.).
+Integration avec Umami Analytics pour recuperer les donnees de trafic en temps reel : statistiques, pages vues, referrers, pays, navigateurs, evenements. Ces donnees alimentent l'agent Analytics pour des rapports data-driven.
 
 ---
 
-## Cas d'usage — Orchestration
+## Stack technique
 
-### 1. Pipeline SEO complet
+| Composant | Technologie | Version |
+|-----------|-------------|---------|
+| Runtime | Node.js | ES2022 |
+| Langage | TypeScript | 5.5+ |
+| Execution TS | tsx | 4.19+ |
+| IA | Claude (Anthropic) | Sonnet |
+| Orchestration | Trello API | - |
+| Versioning | GitHub API | - |
+| Analytics | Umami API | Cloud |
+| Tests | Vitest | 2.0+ |
+| Linting | ESLint | 9.0+ |
+| Env | dotenv | 17+ |
 
-> Un responsable marketing cree une carte Trello "Audit SEO site e-commerce" avec le label vert.
+---
 
-1. L'orchestrateur detecte la carte dans "Todo" et l'assigne au **SEO Specialist**
-2. L'agent produit un audit technique avec recommandations priorisees
-3. Le livrable est pousse en **Pull Request** sur GitHub
-4. La carte passe en "Review" avec un commentaire resumant les findings
-5. L'equipe review la PR et valide
-
-### 2. Lancement de campagne marketing
-
-> L'equipe cree plusieurs cartes pour un lancement produit.
-
-```
-Carte 1 : "Strategie de lancement Q2"      → Marketing Strategy Agent
-Carte 2 : "Campagne Google Ads lancement"   → Paid Media Agent
-Carte 3 : "Calendrier social media"         → Social Media Agent
-Carte 4 : "Sequence email pre-lancement"    → Email Marketing Agent
-```
-
-Les 3 premieres cartes sont traitees en parallele (limite de concurrence). La 4e est mise en file d'attente. Chaque agent produit son livrable de maniere autonome.
-
-### 3. Reporting mensuel automatise
-
-> Des cartes recurrentes sont creees chaque mois pour les rapports.
-
-- **Analytics Agent** : tableau de bord mensuel avec KPIs
-- **SEO Specialist** : rapport de positionnement et evolution
-- **Paid Media Agent** : rapport de performance des campagnes
-- **Social Media Agent** : rapport d'engagement et croissance
-
-Les rapports sont generes en fichiers Markdown dans `./output/deliverables/reports/`.
-
-### 4. Refonte de marque
-
-> Le directeur marketing initie un projet de rebranding.
-
-1. **Brand Strategy Agent** reçoit "Audit de marque et nouveau positionnement" → produit un document strategique
-2. **Content Strategist** reçoit "Nouveau tone of voice" → definit les guidelines editoriales
-3. **Social Media Agent** reçoit "Adaptation identite reseaux sociaux" → adapte la strategie sociale
-4. Les trois livrables sont publies en Issues GitHub pour review collaborative
-
-### 5. Optimisation continue
-
-> L'orchestrateur tourne en continu et traite les taches au fil de l'eau.
+## Structure du projet
 
 ```
-09:00  Nouvelle carte "Optimiser landing page"    → SEO Specialist
-09:01  Nouvelle carte "A/B test email welcome"     → Email Marketing Agent
-09:15  Livrable SEO produit → PR GitHub creee
-09:18  Livrable Email produit → Document local genere
-09:30  Prochain cycle de polling...
+src/
+├── index.ts                      # Point d'entree — polling continu
+├── cli.ts                        # Interface CLI (run, poll, status, create-card, generate, preview)
+├── agents/
+│   └── base-agent.ts             # Classe MarketingAgent — execution des taches via Claude
+├── config/
+│   ├── types.ts                  # Types TypeScript (domaines, priorites, livrables, cartes, prompts)
+│   ├── loader.ts                 # Chargement et validation de la configuration (.env)
+│   └── agents.ts                 # Definitions des 8 agents specialises (prompts, capacites)
+├── orchestrator/
+│   └── orchestrator.ts           # Moteur d'orchestration central (routing, concurrence, workflow)
+├── deliverables/
+│   └── manager.ts                # Production des livrables multi-formats (MD, JSON, PR, Issue)
+├── analytics/
+│   ├── index.ts                  # Export du module analytics
+│   ├── types.ts                  # Types Umami (stats, pageviews, metrics, events)
+│   ├── umami-client.ts           # Client HTTP pour l'API Umami
+│   └── analytics-service.ts      # Service d'agregation des donnees analytics
+├── prompts/
+│   └── generator.ts              # Generateur de prompts inter-agents
+└── trello/
+    ├── client.ts                 # Client API Trello (CRUD cartes, listes, commentaires)
+    └── card-creator.ts           # Creation de cartes Trello depuis les agents
 ```
+
+---
+
+## Prerequis
+
+- **Node.js** >= 18 (support ES2022)
+- Un **board Trello** avec les listes : Backlog, Todo, In Progress, Review, Done
+- Une **cle API Anthropic** (Claude)
+- Un **token GitHub** avec droits repo (pour PRs et Issues)
+- *(Optionnel)* Un compte **Umami Cloud** pour l'analytics
 
 ---
 
 ## Installation
 
 ```bash
-# Cloner le repository
 git clone https://github.com/girardmaxime33000/claude.git
 cd claude
-
-# Installer les dependances
 npm install
+```
 
-# Configurer les variables d'environnement
+---
+
+## Configuration
+
+Copier le fichier d'exemple et renseigner les cles :
+
+```bash
 cp .env.example .env
-# Editer .env avec vos cles API
 ```
 
 ### Variables requises
@@ -255,74 +188,100 @@ cp .env.example .env
 | `TRELLO_API_KEY` | Cle API Trello |
 | `TRELLO_TOKEN` | Token d'authentification Trello |
 | `TRELLO_BOARD_ID` | ID du board Trello cible |
-| `GITHUB_TOKEN` | Token GitHub (pour PRs et Issues) |
-| `GITHUB_OWNER` | Nom d'utilisateur / organisation GitHub |
+| `GITHUB_TOKEN` | Token GitHub (repos, PRs, Issues) |
+| `GITHUB_OWNER` | Nom d'utilisateur ou organisation GitHub |
 | `GITHUB_REPO` | Nom du repository cible |
 
 ### Variables optionnelles
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `POLL_INTERVAL_MS` | `30000` | Intervalle de polling en ms |
+| Variable | Defaut | Description |
+|----------|--------|-------------|
+| `POLL_INTERVAL_MS` | `30000` | Intervalle de polling Trello (ms) |
 | `MAX_CONCURRENT_AGENTS` | `3` | Nombre max d'agents en parallele |
 | `AUTO_ASSIGN` | `true` | Attribution automatique des taches |
+| `UMAMI_API_KEY` | - | Cle API Umami Cloud |
+| `UMAMI_WEBSITE_ID` | - | UUID du site Umami |
+| `UMAMI_API_ENDPOINT` | `https://api.umami.is/v1` | Endpoint API Umami |
+| `UMAMI_TIMEZONE` | `UTC` | Timezone pour les requetes Umami |
 
 ---
 
 ## Utilisation
 
+### Mode continu (production)
+
 ```bash
-# Mode production — polling continu
+# Polling continu — surveille Trello et traite les taches automatiquement
 npm start
 
 # Mode developpement — watch + auto-restart
 npm run dev
+```
 
-# Executer une tache specifique par ID de carte Trello
+### Commandes CLI
+
+```bash
+# Executer une tache par ID de carte Trello
 npm run agent:run <card-id>
 
 # Executer un seul cycle de polling
 npm run agent:poll
 
-# Voir les taches en cours
+# Voir les taches en cours d'execution
 npm run agent:status
+
+# Creer une carte Trello
+npm run agent:create-card "Audit SEO du site" -- --domain seo --priority high
+
+# Generer des prompts et creer les cartes automatiquement a partir d'un objectif
+npm run agent:generate "Lancer une campagne de notoriete pour notre produit SaaS"
+
+# Previsualiser les prompts generes (sans creation de cartes)
+npm run agent:preview "Ameliorer notre strategie email marketing"
+```
+
+### Verification du code
+
+```bash
+npm run typecheck    # Verification des types TypeScript
+npm run lint         # Linting ESLint
+npm test             # Tests unitaires (Vitest)
 ```
 
 ---
 
-## Stack technique
+## Cas d'usage
 
-| Composant | Technologie |
-|-----------|-------------|
-| Runtime | Node.js (ES2022) |
-| Langage | TypeScript 5.5 |
-| IA | Claude Sonnet (Anthropic) |
-| Gestion de taches | Trello API |
-| Versioning / Review | GitHub API |
-| Tests | Vitest |
-| Linting | ESLint |
+### Pipeline SEO complet
 
----
+1. Un responsable marketing cree une carte Trello "Audit SEO site e-commerce" avec le label vert
+2. L'orchestrateur detecte la carte et l'assigne au **SEO Specialist**
+3. L'agent produit un audit technique avec recommandations priorisees
+4. Le livrable est pousse en **Pull Request** sur GitHub
+5. La carte passe en "Review" avec un commentaire resumant les findings
 
-## Structure du projet
+### Lancement de campagne multi-agents
 
 ```
-src/
-├── index.ts                  # Point d'entree — mode polling continu
-├── cli.ts                    # Interface CLI (run, poll, status, agents)
-├── agents/
-│   └── base-agent.ts         # Classe MarketingAgent — execution des taches
-├── config/
-│   ├── types.ts              # Types TypeScript (domaines, priorites, livrables)
-│   ├── loader.ts             # Chargement et validation de la configuration
-│   └── agents.ts             # Definitions des 8 agents specialises
-├── orchestrator/
-│   └── orchestrator.ts       # Moteur d'orchestration central
-├── deliverables/
-│   └── manager.ts            # Production des livrables multi-formats
-└── trello/
-    └── client.ts             # Client API Trello (CRUD cartes, listes, commentaires)
+Carte 1 : "Strategie de lancement Q2"      → Marketing Strategy Agent
+Carte 2 : "Campagne Google Ads lancement"   → Paid Media Agent
+Carte 3 : "Calendrier social media"         → Social Media Agent
+Carte 4 : "Sequence email pre-lancement"    → Email Marketing Agent
 ```
+
+Les 3 premieres cartes sont traitees en parallele. La 4e est mise en file d'attente.
+
+### Generation automatique depuis un objectif
+
+```bash
+npm run agent:generate "Lancer notre nouveau produit SaaS sur le marche francais"
+```
+
+Le systeme decompose l'objectif, genere des prompts specialises et cree automatiquement les cartes Trello pour chaque agent concerne.
+
+### Reporting mensuel automatise
+
+Des cartes recurrentes declenchent la generation de rapports par les agents Analytics, SEO, Paid Media et Social Media. Les rapports sont stockes en Markdown dans `./output/deliverables/reports/`.
 
 ---
 

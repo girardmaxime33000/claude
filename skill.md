@@ -6,7 +6,7 @@ Reference des competences et capacites de chaque agent du systeme multi-agents m
 
 ## Vue d'ensemble
 
-Le systeme dispose de **8 agents specialises**, chacun couvrant un domaine du marketing digital. Ils sont orchestres via Trello et executes par Claude (Anthropic). Chaque agent recoit une tache, l'analyse et produit un livrable actionnable.
+Le systeme dispose de **9 agents specialises**, chacun couvrant un domaine du marketing digital. Ils sont orchestres via Trello et executes par Claude (Anthropic). Chaque agent recoit une tache, l'analyse et produit un livrable actionnable.
 
 ---
 
@@ -294,6 +294,141 @@ Before publishing:
 | `okr_definition` | Definition d'OKRs et KPIs marketing |
 
 **Livrables types** : plans marketing, analyses de marche, recommandations strategiques.
+
+---
+
+### Lead Research Assistant (`lead-research-assistant`)
+
+> Identifies high-quality leads for your product or service by analyzing your business, searching for target companies, and providing actionable contact strategies. Perfect for sales, business development, and marketing professionals.
+
+**Use when** : finding potential customers or clients, building outreach lists, identifying target accounts for sales, researching companies matching your ideal customer profile, or preparing for business development activities.
+
+| Competence | Description |
+|------------|-------------|
+| `business_analysis` | Analyzes your product/service, value proposition, and target market |
+| `lead_identification` | Finds companies matching your ICP by industry, size, location, tech stack, growth stage, and pain points |
+| `lead_scoring` | Ranks and prioritizes companies based on fit score (1-10) and relevance |
+| `contact_strategy` | Suggests personalized approaches for each lead with tailored messaging |
+| `data_enrichment` | Gathers information about decision-makers, company context, and outreach angles |
+
+#### How It Works
+
+1. **Understand the Product/Service** — Analyze codebase (if available) or product description to identify value proposition, key features, and problems solved
+2. **Define Ideal Customer Profile** — Determine target industries, company size, geography, pain points, and technology requirements
+3. **Research and Identify Leads** — Search for matching companies, look for need signals (job postings, tech stack, news), consider growth indicators (funding, expansion, hiring)
+4. **Prioritize and Score** — Create a fit score (1-10) considering ICP alignment, immediate need signals, budget availability, competitive landscape, and timing
+5. **Provide Actionable Output** — Deliver structured lead profiles with contact strategies
+
+#### Usage
+
+**Basic**
+
+```
+I'm building [product description]. Find me 10 companies in [location/industry]
+that would be good leads for this.
+```
+
+**From codebase context**
+
+```
+Look at what I'm building in this repository and identify the top 10 companies
+in [location/industry] that would benefit from this product.
+```
+
+**Advanced with ICP**
+
+```
+My product: [description]
+Ideal customer profile:
+- Industry: [industry]
+- Company size: [size range]
+- Location: [location]
+- Current pain points: [pain points]
+- Technologies they use: [tech stack]
+
+Find me 20 qualified leads with contact strategies for each.
+```
+
+#### Output Format
+
+```markdown
+# Lead Research Results
+
+## Summary
+- Total leads found: [X]
+- High priority (8-10): [X]
+- Medium priority (5-7): [X]
+- Average fit score: [X]
+
+---
+
+## Lead 1: [Company Name]
+
+**Website**: [URL]
+**Priority Score**: [X/10]
+**Industry**: [Industry]
+**Size**: [Employee count/revenue range]
+
+**Why They're a Good Fit**:
+[2-3 specific reasons based on their business]
+
+**Target Decision Maker**: [Role/Title]
+**LinkedIn**: [URL if available]
+
+**Value Proposition for Them**:
+[Specific benefit for this company]
+
+**Outreach Strategy**:
+[Personalized approach - mention specific pain points, recent company news, or relevant context]
+
+**Conversation Starters**:
+- [Specific point 1]
+- [Specific point 2]
+```
+
+#### Scoring Criteria
+
+| Factor | Weight | Description |
+|--------|--------|-------------|
+| ICP alignment | High | How closely the company matches your ideal customer profile |
+| Need signals | High | Job postings, tech stack adoption, recent news indicating need |
+| Budget indicators | Medium | Funding rounds, revenue range, growth trajectory |
+| Competitive landscape | Medium | Whether they already use a competing solution |
+| Timing | Low-Medium | Recency of need signals, urgency indicators |
+
+#### Examples
+
+**Example 1 — AI Security Tool**
+
+> "I'm building a tool that masks sensitive data in AI coding assistant queries. Find potential leads."
+
+The agent identifies companies that:
+- Use AI coding assistants (Copilot, Cursor, etc.)
+- Handle sensitive data (fintech, healthcare, legal)
+- Have evidence of using coding agents in their repos
+- May have compliance requirements around data exposure
+- Includes LinkedIn URLs of relevant decision-makers (CISO, VP Engineering)
+
+**Example 2 — Remote Work Consulting**
+
+> "I run a consulting practice for remote team productivity. Find me 10 companies in the Bay Area that recently went remote."
+
+The agent identifies companies that:
+- Recently posted remote job listings
+- Announced remote-first policies
+- Are hiring distributed teams
+- Show signs of remote work challenges (team size growth, multiple locations)
+- Provides personalized outreach strategies for each
+
+#### Next Steps After Research
+
+- Save results to CSV for CRM import
+- Draft personalized outreach messages for top leads
+- Prioritize based on timing and urgency signals
+- Conduct deeper research on highest-scoring leads
+- Analyze competitor customer bases for additional prospects
+
+**Livrables types** : prioritized lead lists, company profiles with fit scores, personalized outreach strategies, CRM-ready CSV exports, decision-maker contact briefs.
 
 ---
 

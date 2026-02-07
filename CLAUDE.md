@@ -75,6 +75,19 @@ No CI/CD pipeline is configured. When added, document:
 
 Document important design decisions here as the project evolves.
 
+## MCP Servers
+
+### Context7 (library documentation)
+
+**Always** use the Context7 MCP server automatically — without waiting for an explicit request — whenever the task involves:
+
+- Looking up library or API documentation
+- Generating code that uses external libraries/frameworks
+- Setting up or configuring tools, frameworks, or dependencies
+- Answering questions about library usage, best practices, or APIs
+
+This ensures responses are grounded in up-to-date, accurate documentation rather than potentially stale training data.
+
 ## Notes for AI Assistants
 
 - This repository is in early development. Expect the structure to change significantly.

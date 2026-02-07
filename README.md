@@ -1,8 +1,10 @@
 # AI Marketing Agents
 
-Systeme multi-agents IA autonome pour le marketing digital. Orchestre par Trello, propulse par Claude (Anthropic), avec production automatique de livrables sur GitHub et en local.
+Systeme multi-agents IA autonome pour le marketing digital. Orchestre par [Trello](https://developer.atlassian.com/cloud/trello/rest/), propulse par [Claude](https://platform.claude.com/docs/en/about-claude/models/overview) (Anthropic), avec production automatique de livrables sur GitHub et en local.
 
 Chaque agent possede une expertise metier, un prompt systeme dedie, et peut deleguer des sous-taches aux autres agents.
+
+> **Modele IA actuel** : [`claude-sonnet-4-20250514`](https://platform.claude.com/docs/en/about-claude/models/overview) (Claude Sonnet 4, mai 2025). Compatible avec les modeles plus recents ([Sonnet 4.5](https://www.anthropic.com/news/claude-sonnet-4-5), [Opus 4.6](https://www.anthropic.com/news/claude-opus-4-5)) — il suffit de modifier le model ID dans `base-agent.ts` et `generator.ts`.
 
 ## Table des matieres
 
@@ -17,6 +19,7 @@ Chaque agent possede une expertise metier, un prompt systeme dedie, et peut dele
 - [Configuration](#configuration)
 - [Utilisation](#utilisation)
 - [Cas d'usage](#cas-dusage)
+- [APIs et references](#apis-et-references)
 - [Licence](#licence)
 
 ---
@@ -178,18 +181,23 @@ Actions automatiques sur les cartes :
 
 ### Analytics (Umami)
 
-Integration via le SDK `@umami/api-client`. Le module `AnalyticsService` produit un rapport complet en une requete :
+Integration via le SDK [`@umami/api-client`](https://www.npmjs.com/package/@umami/api-client) v0.80.0. Authentification par cle API Cloud (header `x-umami-api-key`). Les reponses du SDK suivent le format `{ ok: boolean, data?: T, status: number, error?: any }`.
 
-| Donnee | Methode |
-|--------|---------|
-| Stats globales (pageviews, visitors, visits, bounces, totaltime) | `getStats()` |
-| Pages vues par periode (heure, jour, mois, annee) | `getPageviews()` |
-| Top pages, referrers, pays, navigateurs, devices, OS | `getMetrics()` |
-| Evenements | `getEvents()` |
-| Visiteurs actifs en temps reel | `getActiveVisitors()` |
-| Rapport complet agrege | `getSummary()` |
+Le module `AnalyticsService` produit un rapport complet en une requete :
 
-Le service inclut un formateur Markdown (`formatSummaryAsMarkdown`) pour generer des rapports lisibles avec tableaux comparatifs (periode courante vs precedente).
+| Donnee | Methode | Endpoint Umami |
+|--------|---------|----------------|
+| Stats globales (pageviews, visitors, visits, bounces, totaltime) | `getStats()` | `GET /websites/{id}/stats` |
+| Pages vues par periode (heure, jour, mois, annee) | `getPageviews()` | `GET /websites/{id}/pageviews` |
+| Top pages, referrers, pays, navigateurs, devices, OS | `getMetrics()` | `GET /websites/{id}/metrics` |
+| Evenements | `getEvents()` | `GET /event-data/events` |
+| Visiteurs actifs en temps reel | `getActiveVisitors()` | `GET /websites/{id}/active` |
+| Rapport complet agrege | `getSummary()` | Combine tous les endpoints ci-dessus via `Promise.all` |
+
+Le service inclut :
+- `getSummary(range)` : agregation parallele de toutes les metriques en un seul appel
+- `formatSummaryAsMarkdown(summary)` : generateur de rapport Markdown avec tableaux comparatifs (periode courante vs precedente, bounce rate, temps moyen)
+- `daysAgo(n)` : helper pour creer un `UmamiDateRange` relatif
 
 ### Graceful shutdown
 
@@ -216,18 +224,18 @@ Le processus ecoute `SIGINT` et `SIGTERM` pour arreter proprement le polling et 
 
 ## Stack technique
 
-| Composant | Technologie | Detail |
-|-----------|-------------|--------|
-| Runtime | Node.js | Target ES2022, module ESNext |
-| Langage | TypeScript | ^5.5.0, mode strict |
-| Execution TS | tsx | ^4.19.0 (execution directe + watch) |
-| IA | Claude API | Modele `claude-sonnet-4-20250514`, max 4096 tokens |
-| Orchestration | Trello REST API | CRUD cartes, listes, labels, checklists, commentaires |
-| Livrables | GitHub REST API | Branches, fichiers, Pull Requests, Issues |
-| Analytics | @umami/api-client | ^0.80.0 — SDK officiel Umami Cloud |
-| Env | dotenv | ^17.2.4 — chargement automatique au demarrage |
-| Tests | Vitest | ^2.0.0 |
-| Linting | ESLint | ^9.0.0 |
+| Composant | Technologie | Semver | Version installee | Detail |
+|-----------|-------------|--------|-------------------|--------|
+| Runtime | Node.js | >= 18.18 | 22.22.0 | Target ES2022, module ESNext |
+| Langage | TypeScript | ^5.5.0 | 5.9.3 | Mode strict, `moduleResolution: bundler` |
+| Execution TS | tsx | ^4.19.0 | 4.21.0 | Execution directe + mode watch |
+| IA | [Claude API](https://platform.claude.com/docs/en/api/overview) | — | `claude-sonnet-4-20250514` | `anthropic-version: 2023-06-01`, max 4096 tokens |
+| Orchestration | [Trello REST API v1](https://developer.atlassian.com/cloud/trello/rest/) | — | — | Rate limit : 300 req/10s par cle, 100 req/10s par token |
+| Livrables | [GitHub REST API](https://docs.github.com/en/rest) | — | — | Branches, fichiers, Pull Requests, Issues |
+| Analytics | [@umami/api-client](https://www.npmjs.com/package/@umami/api-client) | ^0.80.0 | 0.80.0 | SDK officiel Umami Cloud, auth via header `x-umami-api-key` |
+| Env | dotenv | ^17.2.4 | 17.2.4 | Chargement automatique via `import "dotenv/config"` |
+| Tests | Vitest | ^2.0.0 | 2.1.9 | `vitest run` + mode watch |
+| Linting | ESLint | ^9.0.0 | 9.39.2 | Flat config (ESLint 9) |
 
 ---
 
@@ -277,11 +285,11 @@ Le processus ecoute `SIGINT` et `SIGTERM` pour arreter proprement le polling et 
 
 ## Prerequis
 
-- **Node.js** >= 18
+- **Node.js** >= 18.18 (impose par `@umami/api-client`)
 - Un **board Trello** avec 5 listes : Backlog, Todo, In Progress, Review, Done
-- Une **cle API Anthropic** avec acces au modele Claude Sonnet
-- Un **token GitHub** avec droits `repo` (creation de branches, fichiers, PRs, Issues)
-- *(Optionnel)* Une **cle API Umami Cloud** pour le module analytics
+- Une **cle API Anthropic** avec acces au modele Claude Sonnet 4+ ([obtenir une cle](https://console.anthropic.com/))
+- Un **token GitHub** avec scope `repo` ([creer un token](https://github.com/settings/tokens))
+- *(Optionnel)* Une **cle API Umami Cloud** pour le module analytics ([umami.is](https://umami.is/))
 
 ---
 
@@ -441,6 +449,41 @@ const prompt = generator.buildFromTemplate("seo_audit", {
 });
 // → prompt structure pret a l'emploi, sans consommer de tokens
 ```
+
+---
+
+## APIs et references
+
+| Service | Documentation | Details |
+|---------|--------------|---------|
+| **Anthropic Claude API** | [platform.claude.com/docs](https://platform.claude.com/docs/en/api/overview) | Header `anthropic-version: 2023-06-01` (seule version supportee). Endpoint : `POST https://api.anthropic.com/v1/messages`. Modeles disponibles : Sonnet 4, Sonnet 4.5, Haiku 4.5, Opus 4.5, Opus 4.6 |
+| **Trello REST API** | [developer.atlassian.com/cloud/trello/rest](https://developer.atlassian.com/cloud/trello/rest/) | API v1. Auth par query params `key` + `token`. Rate limits : 300 req/10s par cle, 100 req/10s par token. Webhooks supportes |
+| **GitHub REST API** | [docs.github.com/en/rest](https://docs.github.com/en/rest) | Auth par Bearer token. Utilise pour la creation de branches, fichiers, PRs et Issues |
+| **Umami API** | [umami.is/docs/api](https://umami.is/docs/api/api-client) | SDK `@umami/api-client`. Auth Cloud via header `x-umami-api-key`. Requiert Node.js >= 18.18 |
+
+### Mise a jour du modele Claude
+
+Le modele IA est configure dans deux fichiers :
+- `src/agents/base-agent.ts` : appel Claude pour l'execution des taches agents
+- `src/prompts/generator.ts` : appel Claude pour la generation de prompts inter-agents
+
+Pour passer a un modele plus recent (ex: `claude-sonnet-4-5-20250929`) :
+
+```typescript
+// Remplacer dans les deux fichiers :
+model: "claude-sonnet-4-20250514"
+// Par :
+model: "claude-sonnet-4-5-20250929"
+```
+
+Modeles disponibles (fevrier 2026) :
+
+| Modele | ID API | Prix (input/output) |
+|--------|--------|---------------------|
+| Opus 4.6 | `claude-opus-4-6` | $15 / $75 par Mtokens |
+| Sonnet 4.5 | `claude-sonnet-4-5-20250929` | $3 / $15 par Mtokens |
+| Haiku 4.5 | `claude-haiku-4-5-20251001` | $1 / $5 par Mtokens |
+| **Sonnet 4** (actuel) | `claude-sonnet-4-20250514` | $3 / $15 par Mtokens |
 
 ---
 

@@ -28,19 +28,176 @@ Le systeme dispose de **8 agents specialises**, chacun couvrant un domaine du ma
 
 ---
 
-### Content Strategist (`content`)
+### Content Creator (`content-creator`)
 
+> Creates engaging content for blogs, social media, and marketing materials with audience focus.
+
+**License** : MIT
+**Author** : awesome-llm-apps
+**Version** : 1.0.0
 **Label Trello** : bleu
+
+**Use when** : writing blog posts, creating social media content, developing marketing copy, crafting engaging headlines, or when user mentions content creation, blogging, social media, or audience engagement.
 
 | Competence | Description |
 |------------|-------------|
-| `editorial_calendar` | Creation de calendriers editoriaux multi-canaux |
-| `content_writing` | Redaction d'articles, landing pages, newsletters |
-| `content_audit` | Audit de contenu existant (qualite, performance, gaps) |
-| `tone_of_voice` | Definition de tone of voice et guidelines editoriales |
-| `content_repurposing` | Adaptation de contenu cross-canal (blog → social, video → article, etc.) |
+| `blog_writing` | Blog posts and articles (800-2000 words) with hooks, structure, and CTAs |
+| `social_media_content` | Platform-specific content for Twitter/X, LinkedIn, Instagram |
+| `marketing_copy` | Marketing copy, product descriptions, email newsletters |
+| `headline_crafting` | Compelling headlines using proven formulas (How To, List, Question, Curiosity Gap, etc.) |
+| `audience_engagement` | Storytelling, social proof, emotional triggers, and engagement techniques |
 
-**Livrables types** : articles prets a publier, calendriers editoriaux, guidelines de contenu.
+#### Content Creation Framework
+
+1. **Know Your Audience** — Identify who you're writing for, their pain points, expertise level, and desired action
+2. **Hook Immediately** — First sentence must grab attention; lead with value, intrigue, or emotion
+3. **Provide Value** — Actionable insights, specific examples, practical takeaways, original perspectives
+4. **Make It Scannable** — Short paragraphs (2-3 sentences), subheadings, bulleted lists, bold key points
+5. **End With Action** — Clear call-to-action, next steps, conversation starter, resource links
+
+#### Platform-Specific Guidelines
+
+**Blog Posts (800-2000 words)**
+
+```markdown
+# Attention-Grabbing Headline
+
+[Opening hook - question, statistic, or bold claim]
+
+## The Problem
+[Describe pain point reader experiences]
+
+## The Solution
+[Your main content with examples]
+
+### Subpoint 1
+[Detail with example]
+
+### Subpoint 2
+[Detail with example]
+
+## Key Takeaways
+- [Actionable insight 1]
+- [Actionable insight 2]
+
+## Next Steps
+[What reader should do now]
+```
+
+**Twitter/X Threads (280 chars/tweet)**
+
+```
+1/ [Hook - bold claim or question]
+2/ [Context or problem setup]
+3-5/ [Main points with examples]
+6/ [Key takeaway]
+7/ [CTA - retweet, follow, click link]
+```
+
+**LinkedIn Posts (1300 chars max)**
+
+```
+[Personal story or observation]
+
+[Transition to broader insight]
+
+[3-5 actionable points]
+
+[Conclusion with engagement question]
+
+#Hashtag #Hashtag #Hashtag
+```
+
+**Email Newsletters**
+
+```
+Subject: [Curiosity-driven subject line]
+
+Hi [Name],
+
+[Personal opening]
+
+[Value proposition paragraph]
+
+Here's what you'll learn:
+- [Point 1]
+- [Point 2]
+- [Point 3]
+
+[Main content sections with headers]
+
+[Clear CTA button or link]
+
+[Sign-off]
+```
+
+#### Headline Formulas
+
+| Formula | Pattern |
+|---------|---------|
+| How To | "How to [Achieve Desired Result] in [Timeframe]" |
+| List | "[Number] Ways to [Solve Problem]" |
+| Question | "Are You Making These [Number] [Mistakes]?" |
+| Negative | "Stop [Doing X] Until You Read This" |
+| Curiosity Gap | "The [Adjective] Secret to [Desired Result]" |
+| Before/After | "From [Bad State] to [Good State] in [Timeframe]" |
+
+#### Engagement Techniques
+
+- **Storytelling** — Start with a relatable scenario, build tension, deliver insight, connect to reader
+- **Social Proof** — Case studies, testimonials, statistics, expert opinions
+- **Emotional Triggers** — Fear ("Don't make this costly mistake"), Curiosity ("The surprising truth about..."), Aspiration ("How top performers..."), Urgency ("Limited time opportunity"), Belonging ("Join thousands who...")
+
+#### Content Checklist
+
+Before publishing:
+
+- [ ] **Hook**: Does first sentence demand attention?
+- [ ] **Value**: Will reader learn something actionable?
+- [ ] **Flow**: Does content progress logically?
+- [ ] **Scannability**: Can you skim and get main points?
+- [ ] **Examples**: Are abstract concepts illustrated?
+- [ ] **CTA**: Is next action clear?
+- [ ] **Tone**: Matches brand voice and audience?
+- [ ] **Proofread**: No typos or grammar errors?
+
+#### Example
+
+**Request**: "Write a LinkedIn post about staying productive while working remotely"
+
+**Response**:
+
+> I used to think productivity meant working 12-hour days.
+>
+> Then remote work taught me something different.
+>
+> Last year, I worked from home for 230 days. Here's what actually kept me productive (it's not what you think):
+>
+> **1. Start with friction**
+> Don't check email first thing. Your morning energy is precious - use it for deep work, not inbox triage. I write code or create content between 9-11am. No Slack, no email, no meetings.
+>
+> **2. Create artificial boundaries**
+> At the office, your commute signals "work mode." At home, you need new triggers. Mine: Change clothes. Sounds simple, but pajamas = brain says "relax mode."
+>
+> **3. Embrace the async**
+> Your coworkers don't need you instantly available. Set 2-3 "sync windows" daily for meetings/Slack. Rest of the time? Notifications off. Deep work on.
+>
+> **4. Physical movement breaks**
+> Sitting = new smoking. Every 90 minutes, move your body. My rule: Can't start next task until I've walked around the block. Non-negotiable.
+>
+> **5. Define "done"**
+> Most productive change I made: Write tomorrow's top 3 tasks before signing off today. Waking up without a plan = scattered energy. Waking up with clarity = momentum.
+>
+> **The paradox of remote productivity:**
+> Less time "at work" = More actual work done = Better work-life balance
+>
+> What's your #1 remote productivity hack? Drop it below
+>
+> #RemoteWork #Productivity #WorkFromHome
+
+*Why this works*: Opens with relatable pain point, personal story builds credibility, numbered points are scannable, concrete actionable advice, ends with engagement question, appropriate hashtags for reach.
+
+**Livrables types** : blog posts, social media posts, marketing copy, email newsletters, headlines, product descriptions.
 
 ---
 

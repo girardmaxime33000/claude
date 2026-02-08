@@ -21,7 +21,7 @@ Systeme multi-agents IA specialise en marketing digital, orchestre via Trello et
 ## Architecture
 
 ```
-Trello Board                 Orchestrator                  Agents (x8)
+Trello Board                 Orchestrator                  Agents (x9)
 ┌──────────┐   poll/30s    ┌──────────────┐   dispatch   ┌──────────────┐
 │  Todo     │─────────────▶│  Prioriser   │─────────────▶│ SEO          │
 │  En cours │◀─────────────│  Router      │◀─────────────│ Content      │
@@ -31,8 +31,8 @@ Trello Board                 Orchestrator                  Agents (x8)
                                  │ deliverable           │ Email        │
                           ┌──────▼───────┐               │ Brand        │
                           │  GitHub      │               │ Strategy     │
-                          │  PR / Issue  │               └──────────────┘
-                          │  Fichiers    │
+                          │  PR / Issue  │               │ Lead Research│
+                          │  Fichiers    │               └──────────────┘
                           └──────────────┘
 
                           ┌──────────────┐
@@ -47,20 +47,21 @@ Trello Board                 Orchestrator                  Agents (x8)
 
 ## Agents
 
-Le systeme embarque **8 agents specialises**, chacun associe a un domaine marketing et identifie par une couleur de label Trello :
+Le systeme embarque **9 agents specialises**, chacun associe a un domaine marketing et identifie par une couleur de label Trello :
 
 | Agent | Domaine | Label Trello | Capacites |
 |-------|---------|:------------:|-----------|
 | **SEO Specialist** | `seo` | 🟢 vert | Recherche de mots-cles, audit technique, optimisation on-page, analyse concurrentielle, strategie de backlinks |
-| **Content Strategist** | `content` | 🔵 bleu | Calendrier editorial, redaction, audit de contenu, tone of voice, repurposing cross-canal |
+| **Content Creator** | `content-creator` | 🔵 bleu | Blog posts, social media content, marketing copy, headlines, email newsletters, audience engagement |
 | **Paid Media** | `ads` | 🔴 rouge | Configuration de campagnes, copywriting publicitaire, optimisation budgetaire, ciblage d'audiences, reporting ROAS |
 | **Analytics** | `analytics` | 🟠 orange | Creation de dashboards, analyse de donnees, tracking de conversions, modelisation d'attribution, reporting |
 | **Social Media** | `social` | 🟣 violet | Strategie social media, community management, calendrier de publication, strategie d'influence, social listening |
 | **Email Marketing** | `email` | 🟡 jaune | Campagnes email, workflows d'automation, segmentation, A/B testing, deliverabilite |
 | **Brand Strategy** | `brand` | 🩵 ciel | Positionnement de marque, brand guidelines, analyse concurrentielle, messaging, audit de marque |
 | **Marketing Strategy** | `strategy` | ⚫ noir | Plan marketing, allocation budgetaire, etude de marche, strategie de croissance, definition d'OKRs |
+| **Lead Research Assistant** | `lead-research-assistant` | — | Identification de leads, scoring ICP, strategies de contact, enrichissement de donnees, prospection |
 
-Chaque agent recoit un prompt systeme adapte a son expertise et produit des livrables structures (recommandations priorisees, metriques de suivi, documents prets a publier).
+Chaque agent recoit un prompt systeme adapte a son expertise et produit des livrables structures (recommandations priorisees, metriques de suivi, documents prets a publier). Pour une reference detaillee des competences, voir [`skill.md`](./skill.md).
 
 ---
 
@@ -133,7 +134,7 @@ src/
 ├── config/
 │   ├── types.ts                  # Types TypeScript (domaines, priorites, livrables, cartes, prompts)
 │   ├── loader.ts                 # Chargement et validation de la configuration (.env)
-│   └── agents.ts                 # Definitions des 8 agents specialises (prompts, capacites)
+│   └── agents.ts                 # Definitions des 9 agents specialises (prompts, capacites)
 ├── orchestrator/
 │   └── orchestrator.ts           # Moteur d'orchestration central (routing, concurrence, workflow)
 ├── deliverables/

@@ -20,6 +20,7 @@ Chaque agent possede une expertise metier, un prompt systeme dedie, et peut dele
 - [Utilisation](#utilisation)
 - [Cas d'usage](#cas-dusage)
 - [APIs et references](#apis-et-references)
+- [Quoi de neuf](#quoi-de-neuf)
 - [Licence](#licence)
 
 ---
@@ -32,18 +33,18 @@ Chaque agent possede une expertise metier, un prompt systeme dedie, et peut dele
                           │ claude-sonnet-4 │
                           └────────┬────────┘
                                    │
-Trello Board               Orchestrator                    Agents (x8)
-┌──────────┐  poll/30s  ┌──────────────────┐  dispatch  ┌───────────────┐
-│ Backlog  │            │                  │           │ SEO           │
-│ Todo     │───────────▶│  Priorite        │──────────▶│ Content       │
-│ En cours │◀───────────│  Routage         │◀──────────│ Ads           │
-│ Review   │  move card │  Concurrence     │  result   │ Analytics     │
-│ Done     │            │  Gestion erreurs │           │ Social        │
-└──────────┘            └──────┬───────────┘           │ Email         │
-                               │                       │ Brand         │
+Trello Board               Orchestrator                    Agents (x9)
+┌────────────┐ poll/30s ┌──────────────────┐  dispatch  ┌───────────────┐
+│ Backlog    │          │                  │           │ SEO           │
+│ Todo       │─────────▶│  Priorite        │──────────▶│ Content       │
+│ En cours   │◀─────────│  Routage         │◀──────────│ Ads           │
+│ Review     │ move card│  Concurrence     │  result   │ Analytics     │
+│ Done       │          │  Gestion erreurs │           │ Social        │
+│ Ticketing  │◀─ error  └──────┬───────────┘           │ Email         │
+└────────────┘                 │                       │ Brand         │
               ┌────────────────┼────────────────┐      │ Strategy      │
-              │                │                │      └───────┬───────┘
-              ▼                ▼                ▼              │
+              │                │                │      │ Lead Research │
+              ▼                ▼                ▼      └───────┬───────┘
      ┌────────────┐   ┌──────────────┐  ┌───────────┐        │ delegation
      │  GitHub    │   │  Fichiers    │  │  Umami    │        ▼
      │  PR/Issue  │   │  ./output/   │  │ Analytics │  ┌───────────────┐
@@ -62,44 +63,42 @@ Trello Board               Orchestrator                    Agents (x8)
 5. **Execution** : L'agent appelle Claude avec son prompt systeme + les instructions de la tache. Il peut deleguer des sous-taches a d'autres agents via des blocs `DELEGATE`
 6. **Livrable** : Le `DeliverableManager` produit le livrable (Markdown local, Pull Request GitHub, Issue GitHub, ou JSON de configuration)
 7. **Cloture** : La carte passe en "Review" ou "Done", un commentaire structure est ajoute avec le lien vers le livrable, et une checklist "Prochaines etapes" est creee
-8. **Erreur** : En cas d'echec, la carte retourne en "Todo" avec un commentaire d'erreur pour intervention manuelle
+8. **Erreur** : En cas d'echec, la carte est deplacee dans "Ticketing" avec un commentaire diagnostique (erreur, agent, solutions possibles) pour investigation manuelle. Le commentaire et le deplacement sont proteges independamment pour garantir que la carte ne reste jamais bloquee en "In Progress"
 
 ---
 
 ## Agents specialises
 
-Le systeme embarque **8 agents**, chacun identifie par un domaine, un prompt systeme et une couleur de label Trello :
+Le systeme embarque **9 agents**, chacun identifie par un domaine, un prompt systeme et une couleur de label Trello :
 
 | Agent | Domaine | Label | Capacites principales |
 |-------|---------|:-----:|----------------------|
 | **SEO Specialist** | `seo` | 🟢 | Recherche de mots-cles, audit technique (Core Web Vitals, crawlabilite), optimisation on-page, analyse concurrentielle, strategie de backlinks |
-| **Content Strategist** | `content` | 🔵 | Calendrier editorial, redaction (articles, landing pages, newsletters), audit de contenu, tone of voice, repurposing cross-canal |
+| **Content Creator** | `content-creator` | 🔵 | Blog posts, social media content (Twitter/X, LinkedIn, Instagram), marketing copy, headlines, email newsletters, audience engagement |
 | **Paid Media** | `ads` | 🔴 | Campagnes Google Ads / Meta Ads / LinkedIn Ads, copywriting publicitaire, optimisation budgetaire, ciblage d'audiences, reporting ROAS |
 | **Analytics** | `analytics` | 🟠 | Dashboards, analyse de donnees, tracking de conversions (GA4, GTM), modelisation d'attribution, analyse de cohortes |
 | **Social Media** | `social` | 🟣 | Strategie multi-plateforme, community management, calendrier de publication, strategie d'influence, social listening |
 | **Email Marketing** | `email` | 🟡 | Campagnes email, workflows d'automation et nurturing, segmentation, A/B testing, deliverabilite et conformite RGPD |
 | **Brand Strategy** | `brand` | 🩵 | Positionnement de marque, brand guidelines, analyse concurrentielle et mapping, plateforme de marque, audit de perception |
 | **Marketing Strategy** | `strategy` | ⚫ | Plan marketing annuel, allocation budgetaire et ROI previsionnel, etude de marche, strategie Go-to-Market, definition d'OKRs |
+| **Lead Research Assistant** | `lead-research-assistant` | — | Identification de leads qualifies, scoring ICP (1-10), strategies de contact personnalisees, enrichissement de donnees, prospection |
+
+Chaque agent recoit un prompt systeme adapte a son expertise et produit des livrables structures (recommandations priorisees, metriques de suivi, documents prets a publier). Pour une reference detaillee des competences, voir [`skill.md`](./skill.md).
 
 ### Detection bilingue des domaines
 
 Le routage supporte les mots-cles en francais et en anglais. Exemples :
 
-Le systeme embarque **9 agents specialises**, chacun associe a un domaine marketing et identifie par une couleur de label Trello :
-
-| Agent | Domaine | Label Trello | Capacites |
-|-------|---------|:------------:|-----------|
-| **SEO Specialist** | `seo` | 🟢 vert | Recherche de mots-cles, audit technique, optimisation on-page, analyse concurrentielle, strategie de backlinks |
-| **Content Creator** | `content-creator` | 🔵 bleu | Blog posts, social media content, marketing copy, headlines, email newsletters, audience engagement |
-| **Paid Media** | `ads` | 🔴 rouge | Configuration de campagnes, copywriting publicitaire, optimisation budgetaire, ciblage d'audiences, reporting ROAS |
-| **Analytics** | `analytics` | 🟠 orange | Creation de dashboards, analyse de donnees, tracking de conversions, modelisation d'attribution, reporting |
-| **Social Media** | `social` | 🟣 violet | Strategie social media, community management, calendrier de publication, strategie d'influence, social listening |
-| **Email Marketing** | `email` | 🟡 jaune | Campagnes email, workflows d'automation, segmentation, A/B testing, deliverabilite |
-| **Brand Strategy** | `brand` | 🩵 ciel | Positionnement de marque, brand guidelines, analyse concurrentielle, messaging, audit de marque |
-| **Marketing Strategy** | `strategy` | ⚫ noir | Plan marketing, allocation budgetaire, etude de marche, strategie de croissance, definition d'OKRs |
-| **Lead Research Assistant** | `lead-research-assistant` | — | Identification de leads, scoring ICP, strategies de contact, enrichissement de donnees, prospection |
-
-Chaque agent recoit un prompt systeme adapte a son expertise et produit des livrables structures (recommandations priorisees, metriques de suivi, documents prets a publier). Pour une reference detaillee des competences, voir [`skill.md`](./skill.md).
+| Mot-cle | Domaine detecte |
+|---------|----------------|
+| "seo", "referencement" | `seo` |
+| "content", "contenu", "redaction" | `content` |
+| "ads", "publicite", "paid media" | `ads` |
+| "analytics", "data" | `analytics` |
+| "social", "reseaux sociaux" | `social` |
+| "email", "emailing", "crm" | `email` |
+| "brand", "marque" | `brand` |
+| "strategy", "strategie" | `strategy` |
 
 ---
 
@@ -149,7 +148,8 @@ Deux modes de generation :
 
 ### Workflow Trello
 
-Cycle complet : **Backlog** > **Todo** > **In Progress** > **Review** > **Done**
+Cycle nominal : **Backlog** > **Todo** > **In Progress** > **Review** > **Done**
+Cycle en erreur : **In Progress** > **Ticketing** (investigation manuelle)
 
 Noms de listes supportes (FR/EN) :
 
@@ -160,12 +160,14 @@ Noms de listes supportes (FR/EN) :
 | `in_progress` | In Progress, In_Progress, En cours |
 | `review` | Review, En Review, A valider |
 | `done` | Done, Termine, Fait |
+| `ticketing` | Ticketing |
 
 Actions automatiques sur les cartes :
 - Deplacement entre listes selon l'avancement
 - Commentaire structure avec resume, lien vers le livrable et sous-taches creees
 - Checklist "Prochaines etapes" ajoutee automatiquement
 - Commentaires de liaison parent/enfant pour les delegations
+- En cas d'erreur : commentaire diagnostique (agent, erreur, solutions possibles) et deplacement vers Ticketing
 
 ### Analytics (Umami)
 
@@ -260,7 +262,7 @@ src/
 ## Prerequis
 
 - **Node.js** >= 18.18 (impose par `@umami/api-client`)
-- Un **board Trello** avec 5 listes : Backlog, Todo, In Progress, Review, Done
+- Un **board Trello** avec 6 listes : Backlog, Todo, In Progress, Review, Done, Ticketing
 - Une **cle API Anthropic** avec acces au modele Claude Sonnet 4+ ([obtenir une cle](https://console.anthropic.com/))
 - Un **token GitHub** avec scope `repo` ([creer un token](https://github.com/settings/tokens))
 - *(Optionnel)* Une **cle API Umami Cloud** pour le module analytics ([umami.is](https://umami.is/))
@@ -356,7 +358,7 @@ Options de `create-card` :
 | `--domain` | seo, content, ads, analytics, social, email, brand, strategy | strategy |
 | `--desc` | Texte libre | - |
 | `--priority` | low, medium, high, urgent | medium |
-| `--stage` | backlog, todo, in_progress, review, done | todo |
+| `--stage` | backlog, todo, in_progress, review, done, ticketing | todo |
 
 ### Verification du code
 
@@ -458,6 +460,63 @@ Modeles disponibles (fevrier 2026) :
 | Sonnet 4.5 | `claude-sonnet-4-5-20250929` | $3 / $15 par Mtokens |
 | Haiku 4.5 | `claude-haiku-4-5-20251001` | $1 / $5 par Mtokens |
 | **Sonnet 4** (actuel) | `claude-sonnet-4-20250514` | $3 / $15 par Mtokens |
+
+---
+
+## Quoi de neuf
+
+### v1.4.0 — 8 fevrier 2026
+
+**Gestion d'erreurs et colonne Ticketing**
+
+- **Ticketing** : nouvelle colonne Trello pour les taches en echec. Les cartes ne restent plus bloquees en "In Progress"
+- **Commentaires diagnostiques** : en cas d'erreur, un commentaire structure est ajoute a la carte avec le nom de l'agent, l'erreur, et des solutions possibles (timeout, rate limit, auth, 404, SHA, etc.)
+- **Resilience** : le commentaire et le deplacement de carte sont proteges par des try/catch independants — si l'un echoue, l'autre s'execute quand meme
+- **Validation GitHub** : le SHA de la branche par defaut est verifie avant de creer une PR, avec un message d'erreur clair si le repo est vide ou la branche introuvable
+- **Nouveau skill** : [`lead-research-assistant`](./skill.md) — identification de leads qualifies, scoring ICP, strategies de contact
+
+### v1.3.0 — 7 fevrier 2026
+
+**Agents Content Creator et Lead Research**
+
+- **Content Creator** (`content-creator`) remplace Content Strategist — framework complet de creation de contenu avec templates par plateforme (blog, Twitter/X, LinkedIn, email), formules de headlines, techniques d'engagement et checklist pre-publication
+- **Lead Research Assistant** (`lead-research-assistant`) — nouvel agent de prospection avec analyse produit, identification de leads par ICP, scoring (1-10), strategies de contact personnalisees
+- **skill.md** : nouvelle documentation de reference pour les competences de tous les agents
+- Le systeme passe de 8 a **9 agents**
+
+### v1.2.0 — 7 fevrier 2026
+
+**Documentation enrichie et Context7 MCP**
+
+- README enrichi avec donnees verifiees des APIs officielles (Claude, Trello, GitHub, Umami)
+- Ajout des templates de prompts pre-construits (8 templates, utilisables sans appel API)
+- Section APIs et references avec liens vers la documentation officielle
+- Integration du serveur MCP Context7 pour la documentation a jour des librairies
+- Table des modeles Claude disponibles avec pricing
+
+### v1.1.0 — 7 fevrier 2026
+
+**Audit de securite et correctifs**
+
+- Audit de securite complet : 17 vulnerabilites identifiees, 14 corrigees
+- Protection contre le path traversal (CRITIQUE-02)
+- Timeouts sur toutes les requetes HTTP (HAUTE-05)
+- Verification des reponses API (HAUTE-04)
+- Sanitisation des URLs dans les logs (CRITIQUE-03)
+- Idempotence des taches pour eviter les doublons (MOYENNE-05)
+
+### v1.0.0 — 6 fevrier 2026
+
+**Lancement initial**
+
+- 8 agents marketing specialises (SEO, Content, Ads, Analytics, Social, Email, Brand, Strategy)
+- Orchestration via Trello avec polling, priorisation et routage automatique
+- Execution concurrente (jusqu'a 3 agents en parallele)
+- Livrables multi-formats : Markdown, Pull Request GitHub, Issue GitHub, JSON
+- Generation de prompts inter-agents et delegation en chaine
+- Integration Umami Analytics (remplacement GA4/Search Console)
+- Interface CLI complete (run, poll, status, create-card, generate, preview)
+- Graceful shutdown (SIGINT/SIGTERM)
 
 ---
 

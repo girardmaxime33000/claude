@@ -286,7 +286,7 @@ ${delegationBlock}`;
         },
         body: JSON.stringify({
           model: "claude-sonnet-4-20250514",
-          max_tokens: 4096,
+          max_tokens: 8192,
           system: this.definition.systemPrompt,
           messages: [{ role: "user", content: prompt }],
         }),
@@ -333,9 +333,25 @@ ${delegationBlock}`;
     };
   }
 
+  /** Known section markers used in agent prompt structure */
+  private static readonly SECTION_MARKERS = [
+    "SUMMARY",
+    "DELIVERABLE_TITLE",
+    "DELIVERABLE_CONTENT",
+    "NEXT_STEPS",
+    "DELEGATE",
+    "END_DELEGATE",
+  ];
+
   private extractSection(text: string, section: string): string {
+    // Build a lookahead that only stops at known section markers, not arbitrary ### headings.
+    // This prevents truncation when Claude's content contains its own ### sub-headings
+    // (e.g., ### Forces, ### Faiblesses in a SWOT analysis).
+    const otherMarkers = MarketingAgent.SECTION_MARKERS
+      .filter((m) => m !== section)
+      .join("|");
     const regex = new RegExp(
-      `###\\s*${section}\\s*\\n([\\s\\S]*?)(?=###|$)`,
+      `###\\s*${section}\\s*\\n([\\s\\S]*?)(?=###\\s*(?:${otherMarkers})\\b|$)`,
       "i"
     );
     const match = regex.exec(text);

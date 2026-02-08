@@ -127,6 +127,7 @@ export class TrelloClient {
       done: "done",
       terminé: "done",
       fait: "done",
+      ticketing: "ticketing",
     };
     return mapping[normalized] ?? null;
   }

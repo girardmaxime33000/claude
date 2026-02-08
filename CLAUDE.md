@@ -26,23 +26,32 @@ No build tools, package managers, or language runtimes are configured yet. When 
 
 ## Common Commands
 
-No scripts or commands are defined yet. Document them here as they are added, for example:
-
 ```bash
 # Install dependencies
-# <package-manager> install
+npm install
 
 # Run development server
-# <package-manager> run dev
+npm run dev
 
 # Run tests
-# <package-manager> test
+npm test
 
-# Build for production
-# <package-manager> run build
+# Type check
+npm run typecheck
 
-# Lint / format
-# <package-manager> run lint
+# Lint
+npm run lint
+
+# Agent commands
+npm run agent:run <card-id>       # Execute a single Trello card
+npm run agent:poll                # Run one polling cycle
+npm run agent:status              # Show running tasks
+
+# Analytics commands (require UMAMI_API_KEY + UMAMI_WEBSITE_ID)
+tsx src/cli.ts analytics --days 30        # Full analytics report
+tsx src/cli.ts analytics:active           # Current active visitors
+tsx src/cli.ts analytics:pages --days 7   # Top pages
+tsx src/cli.ts analytics:referrers        # Top referrers
 ```
 
 ## Testing

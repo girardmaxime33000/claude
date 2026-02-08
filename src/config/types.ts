@@ -19,7 +19,8 @@ export type WorkflowStage =
   | "todo"
   | "in_progress"
   | "review"
-  | "done";
+  | "done"
+  | "ticketing";
 
 /** A task as represented in Trello */
 export interface TrelloCard {

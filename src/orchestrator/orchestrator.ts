@@ -222,10 +222,10 @@ export class Orchestrator {
     // MOYENNE-01: Truncate and sanitize error messages
     const rawMessage = error instanceof Error ? error.message : String(error);
     const message = rawMessage.slice(0, 500);
-    console.error(`   Task "${task.title}" failed: ${message}`);
+    console.error(`   ❌ Task "${task.title}" failed: ${message}`);
 
     const solutions = this.suggestSolutions(message);
-    const comment = `**Erreur lors du traitement automatique**
+    const comment = `**❌ Erreur lors du traitement automatique**
 
 **Agent** : ${this.agents.get(task.domain)?.definition.name ?? task.domain}
 **Domaine** : ${task.domain}
@@ -242,8 +242,24 @@ ${solutions.map((s) => `- ${s}`).join("\n")}
 ---
 *Carte déplacée dans Ticketing le ${new Date().toLocaleDateString("fr-FR")} pour investigation.*`;
 
-    await this.trello.addComment(task.trelloCardId, comment);
-    await this.trello.moveCard(task.trelloCardId, "ticketing");
+    // Ensure the card always moves, even if the comment fails
+    try {
+      await this.trello.addComment(task.trelloCardId, comment);
+    } catch (commentError) {
+      const commentMsg =
+        commentError instanceof Error ? commentError.message : String(commentError);
+      console.error(`   ⚠️ Failed to add error comment to card: ${commentMsg.slice(0, 200)}`);
+    }
+
+    try {
+      await this.trello.moveCard(task.trelloCardId, "ticketing");
+    } catch (moveError) {
+      const moveMsg =
+        moveError instanceof Error ? moveError.message : String(moveError);
+      console.error(
+        `   ⚠️ Failed to move card "${task.title}" to ticketing: ${moveMsg.slice(0, 200)}`
+      );
+    }
   }
 
   /** Suggest possible solutions based on error message patterns */
@@ -272,6 +288,10 @@ ${solutions.map((s) => `- ${s}`).join("\n")}
     if (msg.includes("500") || msg.includes("internal server error")) {
       solutions.push("Erreur serveur côté API — réessayer dans quelques minutes");
     }
+    if (msg.includes("sha") || msg.includes("branch")) {
+      solutions.push("Vérifier que le repository GitHub n'est pas vide et possède une branche par défaut");
+      solutions.push("Vérifier GITHUB_OWNER et GITHUB_REPO dans la configuration");
+    }
     if (msg.includes("trello")) {
       solutions.push("Vérifier que le board Trello est accessible et que les listes existent");
     }
@@ -289,6 +309,7 @@ ${solutions.map((s) => `- ${s}`).join("\n")}
     }
 
     return solutions;
+  }
   }
 
   getStatus(): Array<{

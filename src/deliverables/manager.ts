@@ -83,15 +83,28 @@ export class DeliverableManager {
 
     // 1. Get default branch ref (HAUTE-04: response verified)
     const repoRes = await secureFetchOk(apiBase, { headers });
-    const repoData = (await repoRes.json()) as { default_branch: string };
+    const repoData = (await repoRes.json()) as { default_branch?: string };
     const defaultBranch = repoData.default_branch;
+    if (!defaultBranch) {
+      throw new Error(
+        `GitHub API: impossible de determiner la branche par defaut du repo ${owner}/${repo}`
+      );
+    }
 
     const refRes = await secureFetchOk(
       `${apiBase}/git/ref/heads/${defaultBranch}`,
       { headers }
     );
-    const refData = (await refRes.json()) as { object: { sha: string } };
-    const baseSha = refData.object.sha;
+    const refData = (await refRes.json()) as {
+      object?: { sha?: string };
+    };
+    const baseSha = refData.object?.sha;
+    if (!baseSha) {
+      throw new Error(
+        `GitHub API: impossible de recuperer le SHA de la branche '${defaultBranch}' pour ${owner}/${repo}. ` +
+          `Verifiez que le repository existe et n'est pas vide.`
+      );
+    }
 
     // 2. Create branch (HAUTE-04: response verified)
     await secureFetchOk(`${apiBase}/git/refs`, {

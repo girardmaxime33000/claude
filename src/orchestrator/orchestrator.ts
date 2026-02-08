@@ -14,6 +14,8 @@ import { CardCreator } from "../trello/card-creator.js";
 import { MarketingAgent } from "../agents/base-agent.js";
 import { DeliverableManager } from "../deliverables/manager.js";
 import { PromptGenerator } from "../prompts/generator.js";
+import { AnalyticsService } from "../analytics/index.js";
+import type { AnalyticsSummary } from "../analytics/index.js";
 
 interface RunningTask {
   task: MarketingTask;
@@ -39,6 +41,7 @@ export class Orchestrator {
   private cardCreator: CardCreator;
   private promptGenerator: PromptGenerator;
   private deliverables: DeliverableManager;
+  private analytics: AnalyticsService | null = null;
   private agents: Map<AgentDomain, MarketingAgent> = new Map();
   private running: Map<string, RunningTask> = new Map();
   private pollTimer: ReturnType<typeof setInterval> | null = null;
@@ -57,10 +60,19 @@ export class Orchestrator {
     this.promptGenerator = new PromptGenerator(config.anthropic.apiKey);
     this.deliverables = new DeliverableManager(config.github);
 
+    // Initialize Umami Analytics if configured
+    if (config.umami) {
+      this.analytics = new AnalyticsService(config.umami);
+      console.log("Umami Analytics connected");
+    }
+
     for (const [domain, definition] of AGENT_MAP) {
       const agent = new MarketingAgent(definition, config.anthropic.apiKey);
       agent.setPromptGenerator(this.promptGenerator);
       agent.setCardCreator(this.cardCreator);
+      if (this.analytics) {
+        agent.setAnalytics(this.analytics);
+      }
       this.agents.set(domain, agent);
     }
   }
@@ -89,6 +101,22 @@ export class Orchestrator {
     request: PromptGenerationRequest
   ): Promise<GeneratedPrompt[]> {
     return this.promptGenerator.generateFromObjective(request);
+  }
+
+  /** Get the analytics service (null if Umami is not configured) */
+  getAnalyticsService(): AnalyticsService | null {
+    return this.analytics;
+  }
+
+  /** Fetch a full analytics summary for a given number of days */
+  async getAnalyticsSummary(days = 30): Promise<AnalyticsSummary> {
+    if (!this.analytics) {
+      throw new Error(
+        "Umami Analytics is not configured. Set UMAMI_API_KEY and UMAMI_WEBSITE_ID in your .env file."
+      );
+    }
+    const range = AnalyticsService.daysAgo(days);
+    return this.analytics.getSummary(range);
   }
 
   async start(): Promise<void> {
@@ -309,7 +337,6 @@ ${solutions.map((s) => `- ${s}`).join("\n")}
     }
 
     return solutions;
-  }
   }
 
   getStatus(): Array<{

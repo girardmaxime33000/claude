@@ -1,6 +1,7 @@
 import "dotenv/config";
 import { loadConfig } from "./config/loader.js";
 import { Orchestrator } from "./orchestrator/orchestrator.js";
+import { AnalyticsService } from "./analytics/index.js";
 import { AGENT_DEFINITIONS } from "./config/agents.js";
 import type { AgentDomain, WorkflowStage } from "./config/types.js";
 import { validateDomain, validateStage, validatePriority } from "./utils/validator.js";
@@ -180,6 +181,99 @@ async function cli() {
       break;
     }
 
+    case "analytics": {
+      const flags = parseFlags(args);
+      const days = parseInt(flags.days ?? "30", 10);
+
+      if (days < 1 || days > 365) {
+        console.error("Error: --days must be between 1 and 365.");
+        process.exit(1);
+      }
+
+      const config = loadConfig();
+      if (!config.umami) {
+        console.error(
+          "Error: Umami Analytics is not configured.\n" +
+          "Set UMAMI_API_KEY and UMAMI_WEBSITE_ID in your .env file."
+        );
+        process.exit(1);
+      }
+
+      const analyticsService = new AnalyticsService(config.umami);
+      const range = AnalyticsService.daysAgo(days);
+
+      console.log(`\nFetching Umami analytics data (last ${days} days)...\n`);
+
+      const summary = await analyticsService.getSummary(range);
+      const report = AnalyticsService.formatSummaryAsMarkdown(summary);
+      console.log(report);
+      break;
+    }
+
+    case "analytics:active": {
+      const config = loadConfig();
+      if (!config.umami) {
+        console.error(
+          "Error: Umami Analytics is not configured.\n" +
+          "Set UMAMI_API_KEY and UMAMI_WEBSITE_ID in your .env file."
+        );
+        process.exit(1);
+      }
+
+      const analyticsService = new AnalyticsService(config.umami);
+      const activeVisitors = await analyticsService.umami.getActiveVisitors();
+      console.log(`\nActive visitors right now: ${activeVisitors}`);
+      break;
+    }
+
+    case "analytics:pages": {
+      const flags = parseFlags(args);
+      const days = parseInt(flags.days ?? "30", 10);
+      const limit = parseInt(flags.limit ?? "20", 10);
+
+      const config = loadConfig();
+      if (!config.umami) {
+        console.error("Error: Umami not configured. Set UMAMI_API_KEY and UMAMI_WEBSITE_ID.");
+        process.exit(1);
+      }
+
+      const analyticsService = new AnalyticsService(config.umami);
+      const range = AnalyticsService.daysAgo(days);
+
+      console.log(`\nTop ${limit} pages (last ${days} days):\n`);
+      const pages = await analyticsService.umami.getTopPages(range, limit);
+      console.log("| URL | Views |");
+      console.log("|-----|-------|");
+      for (const p of pages) {
+        console.log(`| ${p.x} | ${p.y.toLocaleString()} |`);
+      }
+      break;
+    }
+
+    case "analytics:referrers": {
+      const flags = parseFlags(args);
+      const days = parseInt(flags.days ?? "30", 10);
+      const limit = parseInt(flags.limit ?? "20", 10);
+
+      const config = loadConfig();
+      if (!config.umami) {
+        console.error("Error: Umami not configured. Set UMAMI_API_KEY and UMAMI_WEBSITE_ID.");
+        process.exit(1);
+      }
+
+      const analyticsService = new AnalyticsService(config.umami);
+      const range = AnalyticsService.daysAgo(days);
+
+      console.log(`\nTop ${limit} referrers (last ${days} days):\n`);
+      const referrers = await analyticsService.umami.getTopReferrers(range, limit);
+      console.log("| Referrer | Visits |");
+      console.log("|----------|--------|");
+      for (const r of referrers) {
+        console.log(`| ${r.x || "(direct)"} | ${r.y.toLocaleString()} |`);
+      }
+      break;
+    }
+
     default:
       console.log(`AI Marketing Agents CLI
 
@@ -192,6 +286,16 @@ Usage:
   tsx src/cli.ts create-card <title> [opts]  Create a Trello card
   tsx src/cli.ts generate <objective>        Generate prompts & create cards
   tsx src/cli.ts preview <objective>         Preview prompts (no creation)
+
+Analytics commands:
+  tsx src/cli.ts analytics [--days N]        Full analytics report (default: 30 days)
+  tsx src/cli.ts analytics:active            Current active visitors
+  tsx src/cli.ts analytics:pages [opts]      Top pages
+  tsx src/cli.ts analytics:referrers [opts]  Top referrers
+
+  Analytics options:
+    --days <N>    Number of days to look back (default: 30)
+    --limit <N>   Number of results to show (default: 20)
 
 Card creation options:
   --domain <domain>     Target agent domain (default: strategy)
@@ -207,7 +311,8 @@ Start continuous mode:
 Examples:
   tsx src/cli.ts create-card "Audit SEO du site" --domain seo --priority high
   tsx src/cli.ts generate "Lancer une campagne de notoriété pour notre produit SaaS"
-  tsx src/cli.ts preview "Améliorer notre stratégie email marketing"
+  tsx src/cli.ts analytics --days 7
+  tsx src/cli.ts analytics:pages --days 14 --limit 10
 `);
   }
 }

@@ -224,12 +224,71 @@ export class Orchestrator {
     const message = rawMessage.slice(0, 500);
     console.error(`   Task "${task.title}" failed: ${message}`);
 
-    await this.trello.addComment(
-      task.trelloCardId,
-      `**Erreur lors du traitement automatique**\n\n\`\`\`\n${message}\n\`\`\`\n\n*La carte a été remise dans Todo pour retraitement ou intervention manuelle.*`
-    );
+    const solutions = this.suggestSolutions(message);
+    const comment = `**Erreur lors du traitement automatique**
 
-    await this.trello.moveCard(task.trelloCardId, "todo");
+**Agent** : ${this.agents.get(task.domain)?.definition.name ?? task.domain}
+**Domaine** : ${task.domain}
+**Priorité** : ${task.priority}
+
+**Erreur** :
+\`\`\`
+${message}
+\`\`\`
+
+**Solutions possibles** :
+${solutions.map((s) => `- ${s}`).join("\n")}
+
+---
+*Carte déplacée dans Ticketing le ${new Date().toLocaleDateString("fr-FR")} pour investigation.*`;
+
+    await this.trello.addComment(task.trelloCardId, comment);
+    await this.trello.moveCard(task.trelloCardId, "ticketing");
+  }
+
+  /** Suggest possible solutions based on error message patterns */
+  private suggestSolutions(errorMessage: string): string[] {
+    const msg = errorMessage.toLowerCase();
+    const solutions: string[] = [];
+
+    if (msg.includes("timeout") || msg.includes("timed out")) {
+      solutions.push("La requête a expiré — réessayer ou augmenter le timeout");
+      solutions.push("Vérifier la connectivité réseau et le statut de l'API Anthropic");
+    }
+    if (msg.includes("rate limit") || msg.includes("429")) {
+      solutions.push("Limite de requêtes atteinte — attendre quelques minutes avant de réessayer");
+      solutions.push("Réduire le nombre d'agents concurrents (MAX_CONCURRENT_AGENTS)");
+    }
+    if (msg.includes("401") || msg.includes("unauthorized") || msg.includes("authentication")) {
+      solutions.push("Clé API invalide ou expirée — vérifier ANTHROPIC_API_KEY");
+      solutions.push("Vérifier les tokens Trello (TRELLO_API_KEY, TRELLO_TOKEN)");
+    }
+    if (msg.includes("403") || msg.includes("forbidden")) {
+      solutions.push("Accès refusé — vérifier les permissions du token GitHub ou Trello");
+    }
+    if (msg.includes("404") || msg.includes("not found")) {
+      solutions.push("Ressource introuvable — vérifier l'ID du board, de la carte ou du repo");
+    }
+    if (msg.includes("500") || msg.includes("internal server error")) {
+      solutions.push("Erreur serveur côté API — réessayer dans quelques minutes");
+    }
+    if (msg.includes("trello")) {
+      solutions.push("Vérifier que le board Trello est accessible et que les listes existent");
+    }
+    if (msg.includes("github") || msg.includes("git")) {
+      solutions.push("Vérifier GITHUB_TOKEN, GITHUB_OWNER et GITHUB_REPO dans la configuration");
+    }
+    if (msg.includes("parse") || msg.includes("json") || msg.includes("unexpected token")) {
+      solutions.push("La réponse de l'API est mal formée — réessayer la tâche");
+    }
+
+    if (solutions.length === 0) {
+      solutions.push("Relancer la tâche manuellement depuis Trello (déplacer dans Todo)");
+      solutions.push("Vérifier les logs du système pour plus de détails");
+      solutions.push("Si le problème persiste, contacter l'équipe technique");
+    }
+
+    return solutions;
   }
 
   getStatus(): Array<{

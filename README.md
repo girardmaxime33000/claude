@@ -85,33 +85,21 @@ Le systeme embarque **8 agents**, chacun identifie par un domaine, un prompt sys
 
 Le routage supporte les mots-cles en francais et en anglais. Exemples :
 
-| Domaine | Mots-cles FR | Mots-cles EN |
-|---------|-------------|-------------|
-| `seo` | referencement | seo, keywords, backlink, search |
-| `content` | contenu, redaction, editorial | content, article, blog |
-| `ads` | publicite | ads, paid, campaign |
-| `analytics` | data | analytics, dashboard, tracking, kpi |
-| `social` | reseaux sociaux | social, community, instagram, linkedin, tiktok |
-| `email` | emailing, crm | email, newsletter, automation, nurturing |
-| `brand` | marque, identite, positionnement | brand, logo |
-| `strategy` | strategie, plan, budget, marche | strategy, growth |
+Le systeme embarque **9 agents specialises**, chacun associe a un domaine marketing et identifie par une couleur de label Trello :
 
-Si aucun domaine n'est detecte, la tache est assignee par defaut a **Marketing Strategy**.
+| Agent | Domaine | Label Trello | Capacites |
+|-------|---------|:------------:|-----------|
+| **SEO Specialist** | `seo` | 🟢 vert | Recherche de mots-cles, audit technique, optimisation on-page, analyse concurrentielle, strategie de backlinks |
+| **Content Creator** | `content-creator` | 🔵 bleu | Blog posts, social media content, marketing copy, headlines, email newsletters, audience engagement |
+| **Paid Media** | `ads` | 🔴 rouge | Configuration de campagnes, copywriting publicitaire, optimisation budgetaire, ciblage d'audiences, reporting ROAS |
+| **Analytics** | `analytics` | 🟠 orange | Creation de dashboards, analyse de donnees, tracking de conversions, modelisation d'attribution, reporting |
+| **Social Media** | `social` | 🟣 violet | Strategie social media, community management, calendrier de publication, strategie d'influence, social listening |
+| **Email Marketing** | `email` | 🟡 jaune | Campagnes email, workflows d'automation, segmentation, A/B testing, deliverabilite |
+| **Brand Strategy** | `brand` | 🩵 ciel | Positionnement de marque, brand guidelines, analyse concurrentielle, messaging, audit de marque |
+| **Marketing Strategy** | `strategy` | ⚫ noir | Plan marketing, allocation budgetaire, etude de marche, strategie de croissance, definition d'OKRs |
+| **Lead Research Assistant** | `lead-research-assistant` | — | Identification de leads, scoring ICP, strategies de contact, enrichissement de donnees, prospection |
 
-### Delegation inter-agents
-
-Pendant l'execution d'une tache, un agent peut autonomement creer des sous-taches pour d'autres agents. Il suffit d'inclure des blocs `DELEGATE` dans sa reponse :
-
-```
-### DELEGATE
-- **domain**: seo
-- **title**: Audit SEO technique du site
-- **description**: Realiser un audit complet...
-- **priority**: high
-### END_DELEGATE
-```
-
-Le systeme cree automatiquement la carte Trello correspondante, lie la carte parente et la sous-tache par des commentaires, et l'agent cible prendra le relais au prochain cycle de polling.
+Chaque agent recoit un prompt systeme adapte a son expertise et produit des livrables structures (recommandations priorisees, metriques de suivi, documents prets a publier). Pour une reference detaillee des competences, voir [`skill.md`](./skill.md).
 
 ---
 
@@ -242,43 +230,29 @@ Le processus ecoute `SIGINT` et `SIGTERM` pour arreter proprement le polling et 
 ## Structure du projet
 
 ```
-.
-├── package.json                  # Nom: ai-marketing-agents, scripts npm, dependances
-├── tsconfig.json                 # TypeScript strict, ES2022, ESNext modules
-├── .env.example                  # Template des variables d'environnement
-├── .gitignore                    # node_modules/, dist/, .env, *.log
-├── CLAUDE.md                     # Guide pour les assistants IA
-├── README.md                     # Ce fichier
-└── src/
-    ├── index.ts                  # Point d'entree — polling continu + graceful shutdown
-    ├── cli.ts                    # CLI : run, poll, status, agents, create-card, generate, preview
-    │
-    ├── orchestrator/
-    │   └── orchestrator.ts       # Moteur central — polling, priorisation, routage, concurrence, erreurs
-    │
-    ├── agents/
-    │   └── base-agent.ts         # Classe MarketingAgent — appel Claude, parsing reponse, delegation
-    │
-    ├── config/
-    │   ├── types.ts              # Types TS : domaines, priorites, taches, livrables, cartes, prompts
-    │   ├── agents.ts             # Definitions des 8 agents (prompt systeme, capacites, labels)
-    │   └── loader.ts             # Chargement .env → AgentSystemConfig avec validation
-    │
-    ├── trello/
-    │   ├── client.ts             # Client API Trello (CRUD, cache listes/labels, parsing cartes)
-    │   └── card-creator.ts       # Creation de cartes depuis requetes directes ou prompts generes
-    │
-    ├── prompts/
-    │   └── generator.ts          # Generation de prompts (IA + templates), detection de domaines
-    │
-    ├── deliverables/
-    │   └── manager.ts            # Production livrables : Markdown, PR GitHub, Issues, JSON
-    │
-    └── analytics/
-        ├── index.ts              # Re-export du module
-        ├── types.ts              # Types Umami (stats, pageviews, metrics, events, config)
-        ├── umami-client.ts       # Client SDK Umami (stats, pages, referrers, events, actifs)
-        └── analytics-service.ts  # Service agrege : getSummary(), formateur Markdown
+src/
+├── index.ts                      # Point d'entree — polling continu
+├── cli.ts                        # Interface CLI (run, poll, status, create-card, generate, preview)
+├── agents/
+│   └── base-agent.ts             # Classe MarketingAgent — execution des taches via Claude
+├── config/
+│   ├── types.ts                  # Types TypeScript (domaines, priorites, livrables, cartes, prompts)
+│   ├── loader.ts                 # Chargement et validation de la configuration (.env)
+│   └── agents.ts                 # Definitions des 9 agents specialises (prompts, capacites)
+├── orchestrator/
+│   └── orchestrator.ts           # Moteur d'orchestration central (routing, concurrence, workflow)
+├── deliverables/
+│   └── manager.ts                # Production des livrables multi-formats (MD, JSON, PR, Issue)
+├── analytics/
+│   ├── index.ts                  # Export du module analytics
+│   ├── types.ts                  # Types Umami (stats, pageviews, metrics, events)
+│   ├── umami-client.ts           # Client HTTP pour l'API Umami
+│   └── analytics-service.ts      # Service d'agregation des donnees analytics
+├── prompts/
+│   └── generator.ts              # Generateur de prompts inter-agents
+└── trello/
+    ├── client.ts                 # Client API Trello (CRUD cartes, listes, commentaires)
+    └── card-creator.ts           # Creation de cartes Trello depuis les agents
 ```
 
 ---

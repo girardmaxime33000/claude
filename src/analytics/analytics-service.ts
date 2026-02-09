@@ -3,7 +3,7 @@
 // ============================================================
 
 import { UmamiClient } from "./umami-client.js";
-import type { UmamiConfig, UmamiDateRange, AnalyticsSummary } from "./types.js";
+import type { UmamiConfig, UmamiDateRange, UmamiStats, AnalyticsSummary } from "./types.js";
 
 export class AnalyticsService {
   public readonly umami: UmamiClient;
@@ -16,7 +16,7 @@ export class AnalyticsService {
    * Generate a full analytics summary for a date range.
    */
   async getSummary(range: UmamiDateRange): Promise<AnalyticsSummary> {
-    const [stats, topPages, topReferrers, topCountries, topBrowsers, topDevices, topEvents] =
+    const [rawStats, topPages, topReferrers, topCountries, topBrowsers, topDevices, topEvents] =
       await Promise.all([
         this.umami.getStats(range),
         this.umami.getTopPages(range, 10),
@@ -27,15 +27,51 @@ export class AnalyticsService {
         this.umami.getEvents(range),
       ]);
 
+    console.log("[AnalyticsService] Raw stats:", JSON.stringify(rawStats).slice(0, 500));
+    console.log("[AnalyticsService] Raw topPages:", JSON.stringify(topPages).slice(0, 300));
+
+    // Normalize stats to handle different Umami API response formats
+    const stats = AnalyticsService.normalizeStats(rawStats);
+
     return {
       stats,
-      topPages,
-      topReferrers,
-      topCountries,
-      topBrowsers,
-      topDevices,
-      topEvents,
+      topPages: Array.isArray(topPages) ? topPages : [],
+      topReferrers: Array.isArray(topReferrers) ? topReferrers : [],
+      topCountries: Array.isArray(topCountries) ? topCountries : [],
+      topBrowsers: Array.isArray(topBrowsers) ? topBrowsers : [],
+      topDevices: Array.isArray(topDevices) ? topDevices : [],
+      topEvents: Array.isArray(topEvents) ? topEvents : [],
       period: range,
+    };
+  }
+
+  /**
+   * Normalize stats response from Umami API.
+   * Handles multiple response shapes:
+   * - { pageviews: { value: N, prev: M } }
+   * - { pageviews: { value: N, change: M } }
+   * - { pageviews: N }  (flat numbers)
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private static normalizeStats(raw: any): UmamiStats {
+    const norm = (field: unknown): { value: number; prev: number } => {
+      if (field === null || field === undefined) return { value: 0, prev: 0 };
+      if (typeof field === "number") return { value: field, prev: 0 };
+      if (typeof field === "object") {
+        const obj = field as Record<string, unknown>;
+        const value = typeof obj.value === "number" ? obj.value : 0;
+        const prev = typeof obj.prev === "number" ? obj.prev
+          : typeof obj.change === "number" ? obj.change : 0;
+        return { value, prev };
+      }
+      return { value: 0, prev: 0 };
+    };
+    return {
+      pageviews: norm(raw?.pageviews),
+      visitors: norm(raw?.visitors),
+      visits: norm(raw?.visits),
+      bounces: norm(raw?.bounces),
+      totaltime: norm(raw?.totaltime),
     };
   }
 
@@ -64,11 +100,12 @@ export class AnalyticsService {
 
     // Global stats
     const s = summary.stats;
-    const bounceRate = s.visits.value > 0
-      ? ((s.bounces.value / s.visits.value) * 100).toFixed(1)
+    const visits = s.visits.value;
+    const bounceRate = visits > 0
+      ? ((s.bounces.value / visits) * 100).toFixed(1)
       : "0.0";
-    const avgTime = s.visits.value > 0
-      ? (s.totaltime.value / s.visits.value).toFixed(0)
+    const avgTime = visits > 0
+      ? (s.totaltime.value / visits).toFixed(0)
       : "0";
 
     lines.push("## Overview");
@@ -84,52 +121,62 @@ export class AnalyticsService {
     lines.push("");
 
     // Top pages
-    lines.push("## Top Pages");
-    lines.push("");
-    lines.push(`| URL | Views |`);
-    lines.push(`|-----|-------|`);
-    for (const p of summary.topPages) {
-      lines.push(`| ${p.x} | ${p.y.toLocaleString()} |`);
+    if (summary.topPages.length > 0) {
+      lines.push("## Top Pages");
+      lines.push("");
+      lines.push(`| URL | Views |`);
+      lines.push(`|-----|-------|`);
+      for (const p of summary.topPages) {
+        lines.push(`| ${p.x} | ${p.y.toLocaleString()} |`);
+      }
+      lines.push("");
     }
-    lines.push("");
 
     // Top referrers
-    lines.push("## Top Referrers");
-    lines.push("");
-    lines.push(`| Referrer | Visits |`);
-    lines.push(`|----------|--------|`);
-    for (const r of summary.topReferrers) {
-      lines.push(`| ${r.x || "(direct)"} | ${r.y.toLocaleString()} |`);
+    if (summary.topReferrers.length > 0) {
+      lines.push("## Top Referrers");
+      lines.push("");
+      lines.push(`| Referrer | Visits |`);
+      lines.push(`|----------|--------|`);
+      for (const r of summary.topReferrers) {
+        lines.push(`| ${r.x || "(direct)"} | ${r.y.toLocaleString()} |`);
+      }
+      lines.push("");
     }
-    lines.push("");
 
     // Top countries
-    lines.push("## Top Countries");
-    lines.push("");
-    lines.push(`| Country | Visitors |`);
-    lines.push(`|---------|----------|`);
-    for (const c of summary.topCountries) {
-      lines.push(`| ${c.x} | ${c.y.toLocaleString()} |`);
+    if (summary.topCountries.length > 0) {
+      lines.push("## Top Countries");
+      lines.push("");
+      lines.push(`| Country | Visitors |`);
+      lines.push(`|---------|----------|`);
+      for (const c of summary.topCountries) {
+        lines.push(`| ${c.x} | ${c.y.toLocaleString()} |`);
+      }
+      lines.push("");
     }
-    lines.push("");
 
     // Top browsers
-    lines.push("## Top Browsers");
-    lines.push("");
-    lines.push(`| Browser | Visitors |`);
-    lines.push(`|---------|----------|`);
-    for (const b of summary.topBrowsers) {
-      lines.push(`| ${b.x} | ${b.y.toLocaleString()} |`);
+    if (summary.topBrowsers.length > 0) {
+      lines.push("## Top Browsers");
+      lines.push("");
+      lines.push(`| Browser | Visitors |`);
+      lines.push(`|---------|----------|`);
+      for (const b of summary.topBrowsers) {
+        lines.push(`| ${b.x} | ${b.y.toLocaleString()} |`);
+      }
+      lines.push("");
     }
-    lines.push("");
 
     // Top devices
-    lines.push("## Top Devices");
-    lines.push("");
-    lines.push(`| Device | Visitors |`);
-    lines.push(`|--------|----------|`);
-    for (const d of summary.topDevices) {
-      lines.push(`| ${d.x} | ${d.y.toLocaleString()} |`);
+    if (summary.topDevices.length > 0) {
+      lines.push("## Top Devices");
+      lines.push("");
+      lines.push(`| Device | Visitors |`);
+      lines.push(`|--------|----------|`);
+      for (const d of summary.topDevices) {
+        lines.push(`| ${d.x} | ${d.y.toLocaleString()} |`);
+      }
     }
 
     return lines.join("\n");

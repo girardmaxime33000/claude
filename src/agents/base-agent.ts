@@ -64,17 +64,27 @@ export class MarketingAgent {
 
     // Fetch live analytics data for analytics-domain tasks
     let analyticsContext = "";
-    if (this.analyticsService && this.definition.domain === "analytics") {
-      try {
-        console.log(`[${this.definition.name}] Fetching Umami analytics data...`);
-        const { AnalyticsService } = await import("../analytics/index.js");
-        const range = AnalyticsService.daysAgo(30);
-        const summary = await this.analyticsService.getSummary(range);
-        analyticsContext = AnalyticsService.formatSummaryAsMarkdown(summary);
-        console.log(`[${this.definition.name}] Analytics data loaded (30 days)`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[${this.definition.name}] Could not fetch analytics: ${msg.slice(0, 200)}`);
+    if (this.definition.domain === "analytics") {
+      if (!this.analyticsService) {
+        console.error(`[${this.definition.name}] ⚠️ analyticsService is NULL — UMAMI_API_KEY or UMAMI_WEBSITE_ID missing from .env`);
+        analyticsContext = `## ⚠️ ERREUR CRITIQUE : Umami Analytics non configuré
+
+Les variables d'environnement UMAMI_API_KEY et UMAMI_WEBSITE_ID ne sont pas définies dans le fichier .env.
+Tu ne peux PAS produire de rapport sans données. Indique cette erreur dans ton rapport.`;
+      } else {
+        try {
+          console.log(`[${this.definition.name}] ✅ analyticsService is available, fetching Umami data...`);
+          analyticsContext = await this.fetchAnalyticsContext(task);
+          console.log(`[${this.definition.name}] ✅ Analytics data loaded (${analyticsContext.length} chars)`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[${this.definition.name}] ❌ ERREUR Umami: ${msg}`);
+          analyticsContext = `## ⚠️ ERREUR : Impossible de récupérer les données Umami
+
+**Erreur technique** : ${msg.slice(0, 300)}
+
+Tu ne peux PAS produire de rapport sans données réelles. Signale cette erreur dans ton rapport et indique la cause technique ci-dessus. Ne génère PAS de données fictives ou de framework théorique.`;
+        }
       }
     }
 
@@ -187,7 +197,7 @@ Pour chaque sous-tâche, ajoute un bloc :
       : "";
 
     const analyticsBlock = analyticsContext
-      ? `\n## Données Analytics Umami (30 derniers jours)\nVoici les données réelles du site web, utilise-les pour enrichir ton analyse :\n\n${analyticsContext}\n`
+      ? `\n## Données Analytics Umami (données réelles)\nVoici les données réelles du site web extraites de Umami. Base ton analyse EXCLUSIVEMENT sur ces données :\n\n${analyticsContext}\n`
       : "";
 
     return `# Tâche à réaliser
@@ -387,6 +397,111 @@ ${delegationBlock}`;
 
   private extractSummary(response: string): string {
     return this.extractSection(response, "SUMMARY") || "Tâche complétée.";
+  }
+
+  /**
+   * Detect how many days of data the task is requesting by parsing
+   * the title and description for time-range keywords.
+   */
+  private detectDaysFromTask(task: MarketingTask): number {
+    const text = `${task.title} ${task.description}`.toLowerCase();
+
+    // Match patterns like "7 jours", "30 days", "2 semaines", "3 mois", "1 an"
+    const daysMatch = text.match(/(\d+)\s*(?:jours?|days?)/);
+    if (daysMatch) return Math.min(parseInt(daysMatch[1], 10), 365);
+
+    const weeksMatch = text.match(/(\d+)\s*(?:semaines?|weeks?)/);
+    if (weeksMatch) return Math.min(parseInt(weeksMatch[1], 10) * 7, 365);
+
+    const monthsMatch = text.match(/(\d+)\s*mois|(\d+)\s*months?/);
+    if (monthsMatch) {
+      const n = parseInt(monthsMatch[1] ?? monthsMatch[2], 10);
+      return Math.min(n * 30, 365);
+    }
+
+    const yearMatch = text.match(/(\d+)\s*(?:ans?|years?)/);
+    if (yearMatch) return Math.min(parseInt(yearMatch[1], 10) * 365, 365);
+
+    // Keyword shortcuts
+    if (text.includes("cette semaine") || text.includes("this week")) return 7;
+    if (text.includes("ce mois") || text.includes("this month")) return 30;
+    if (text.includes("ce trimestre") || text.includes("this quarter")) return 90;
+    if (text.includes("cette année") || text.includes("this year") || text.includes("ytd")) return 365;
+    if (text.includes("hier") || text.includes("yesterday")) return 1;
+    if (text.includes("aujourd'hui") || text.includes("today")) return 1;
+
+    // Match "depuis janvier", "since january", "depuis le 1er janvier"
+    const monthNames: Record<string, number> = {
+      janvier: 0, january: 0, février: 1, february: 1, mars: 2, march: 2,
+      avril: 3, april: 3, mai: 4, may: 4, juin: 5, june: 5,
+      juillet: 6, july: 6, août: 7, august: 7, septembre: 8, september: 8,
+      octobre: 9, october: 9, novembre: 10, november: 10, décembre: 11, december: 11,
+    };
+    for (const [name, monthIndex] of Object.entries(monthNames)) {
+      if (text.includes(name)) {
+        const yearMatch2 = text.match(/20\d{2}/);
+        const year = yearMatch2 ? parseInt(yearMatch2[0], 10) : new Date().getFullYear();
+        const startDate = new Date(year, monthIndex, 1);
+        const diffDays = Math.ceil((Date.now() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+        return Math.max(1, Math.min(diffDays, 365));
+      }
+    }
+
+    // Default: 30 days
+    return 30;
+  }
+
+  /**
+   * Build a rich analytics context by querying Umami with the right time range.
+   * Includes: main period stats, pageviews over time, active visitors, and top metrics.
+   */
+  private async fetchAnalyticsContext(task: MarketingTask): Promise<string> {
+    if (!this.analyticsService) return "";
+
+    const { AnalyticsService: AnalyticsSvc } = await import("../analytics/index.js");
+
+    const days = this.detectDaysFromTask(task);
+    console.log(`[${this.definition.name}] Detected time range: ${days} days`);
+
+    const mainRange = AnalyticsSvc.daysAgo(days);
+
+    // Fetch all data in parallel: main summary + pageviews over time + active visitors
+    const unit = days <= 7 ? "hour" : days <= 90 ? "day" : "month";
+
+    const [summary, pageviews, activeVisitors] = await Promise.all([
+      this.analyticsService.getSummary(mainRange),
+      this.analyticsService.umami.getPageviews(mainRange, unit),
+      this.analyticsService.umami.getActiveVisitors(),
+    ]);
+
+    // Build the context
+    const lines: string[] = [];
+    const start = new Date(mainRange.startAt).toISOString().split("T")[0];
+    const end = new Date(mainRange.endAt).toISOString().split("T")[0];
+
+    lines.push(`### Période analysée : ${start} → ${end} (${days} jours)`);
+    lines.push(`### Visiteurs actifs en ce moment : ${activeVisitors}`);
+    lines.push("");
+
+    // Main report
+    lines.push(AnalyticsSvc.formatSummaryAsMarkdown(summary));
+
+    // Pageviews over time
+    if (pageviews.pageviews && pageviews.pageviews.length > 0) {
+      lines.push("");
+      lines.push("## Évolution des pages vues dans le temps");
+      lines.push("");
+      lines.push(`| Date | Pages vues | Sessions |`);
+      lines.push(`|------|------------|----------|`);
+      for (let i = 0; i < pageviews.pageviews.length; i++) {
+        const pv = pageviews.pageviews[i];
+        const sess = pageviews.sessions[i];
+        const dateLabel = pv.t;
+        lines.push(`| ${dateLabel} | ${pv.y} | ${sess?.y ?? 0} |`);
+      }
+    }
+
+    return lines.join("\n");
   }
 
   private buildTrelloComment(

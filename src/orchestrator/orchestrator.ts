@@ -124,6 +124,7 @@ export class Orchestrator {
     console.log(`   Agents loaded: ${this.agents.size}`);
     console.log(`   Max concurrent: ${this.config.maxConcurrentAgents}`);
     console.log(`   Poll interval: ${this.config.pollIntervalMs}ms`);
+    console.log(`   Umami Analytics: ${this.analytics ? "✅ CONNECTED" : "❌ NOT CONFIGURED (set UMAMI_API_KEY + UMAMI_WEBSITE_ID)"}`);
 
     await this.trello.initialize();
     console.log("Trello board connected");

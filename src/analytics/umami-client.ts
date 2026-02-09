@@ -1,117 +1,127 @@
 // ============================================================
-// Umami Analytics API Client (Cloud API Key auth)
+// Umami Analytics API Client — Direct HTTP (no third-party dependency)
+// Auth: x-umami-api-key header (Umami Cloud API Key)
+// Docs: https://umami.is/docs/api
 // ============================================================
 
-import { UmamiApiClient } from "@umami/api-client";
 import type {
   UmamiConfig,
   UmamiStats,
   UmamiPageviewsResponse,
   UmamiMetric,
   UmamiEventMetric,
-  UmamiActive,
   UmamiMetricType,
   UmamiDateRange,
 } from "./types.js";
 
 const DEFAULT_API_ENDPOINT = "https://api.umami.is/v1";
+const REQUEST_TIMEOUT_MS = 15_000;
 
 export class UmamiClient {
-  private api: UmamiApiClient;
+  private baseUrl: string;
+  private apiKey: string;
   private websiteId: string;
   private timezone: string;
 
   constructor(config: UmamiConfig) {
-    this.api = new UmamiApiClient({
-      apiEndpoint: config.apiEndpoint ?? DEFAULT_API_ENDPOINT,
-      apiKey: config.apiKey,
-    });
+    this.baseUrl = (config.apiEndpoint ?? DEFAULT_API_ENDPOINT).replace(/\/+$/, "");
+    this.apiKey = config.apiKey;
     this.websiteId = config.websiteId;
     this.timezone = config.timezone ?? "UTC";
   }
 
-  /**
-   * Get website stats (pageviews, visitors, visits, bounces, totaltime)
-   * with comparison to previous period.
-   */
-  async getStats(range: UmamiDateRange): Promise<UmamiStats> {
-    const result = await this.api.getWebsiteStats(this.websiteId, {
-      startAt: range.startAt,
-      endAt: range.endAt,
-    });
-    if (!result.ok) {
-      throw new Error(`Failed to get stats: ${result.error ?? result.status}`);
+  // ----- Low-level HTTP -----
+
+  private async request<T>(path: string, params: Record<string, string | number> = {}): Promise<T> {
+    const url = new URL(`${this.baseUrl}${path}`);
+    for (const [key, value] of Object.entries(params)) {
+      url.searchParams.set(key, String(value));
     }
-    return result.data as UmamiStats;
+
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+    try {
+      const response = await fetch(url.toString(), {
+        method: "GET",
+        headers: {
+          "x-umami-api-key": this.apiKey,
+          "Accept": "application/json",
+        },
+        signal: controller.signal,
+      });
+
+      if (!response.ok) {
+        const body = await response.text().catch(() => "");
+        throw new Error(
+          `Umami API ${response.status} ${response.statusText} on ${path}: ${body.slice(0, 300)}`
+        );
+      }
+
+      return (await response.json()) as T;
+    } catch (err) {
+      if (err instanceof DOMException && err.name === "AbortError") {
+        throw new Error(`Umami API timeout after ${REQUEST_TIMEOUT_MS}ms on ${path}`);
+      }
+      throw err;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
-  /**
-   * Get pageviews and sessions over time (grouped by unit: hour, day, month, year).
-   */
+  // ----- Stats -----
+
+  async getStats(range: UmamiDateRange): Promise<UmamiStats> {
+    return this.request<UmamiStats>(
+      `/websites/${this.websiteId}/stats`,
+      { startAt: range.startAt, endAt: range.endAt },
+    );
+  }
+
+  // ----- Pageviews -----
+
   async getPageviews(
     range: UmamiDateRange,
     unit: "hour" | "day" | "month" | "year" = "day",
   ): Promise<UmamiPageviewsResponse> {
-    const result = await this.api.getWebsitePageviews(this.websiteId, {
-      startAt: range.startAt,
-      endAt: range.endAt,
-      unit,
-      timezone: this.timezone,
-    });
-    if (!result.ok) {
-      throw new Error(`Failed to get pageviews: ${result.error ?? result.status}`);
-    }
-    return result.data as unknown as UmamiPageviewsResponse;
+    return this.request<UmamiPageviewsResponse>(
+      `/websites/${this.websiteId}/pageviews`,
+      { startAt: range.startAt, endAt: range.endAt, unit, timezone: this.timezone },
+    );
   }
 
-  /**
-   * Get metrics by type (url, referrer, browser, os, device, country, language, event).
-   */
+  // ----- Metrics -----
+
   async getMetrics(
     range: UmamiDateRange,
     type: UmamiMetricType,
     limit = 10,
   ): Promise<UmamiMetric[]> {
-    const result = await this.api.getWebsiteMetrics(this.websiteId, {
-      startAt: range.startAt,
-      endAt: range.endAt,
-      type,
-      limit,
-    });
-    if (!result.ok) {
-      throw new Error(`Failed to get metrics: ${result.error ?? result.status}`);
-    }
-    return (result.data as unknown as { data: UmamiMetric[] }).data ?? (result.data as unknown as UmamiMetric[]);
+    return this.request<UmamiMetric[]>(
+      `/websites/${this.websiteId}/metrics`,
+      { startAt: range.startAt, endAt: range.endAt, type, limit },
+    );
   }
 
-  /**
-   * Get event metrics.
-   */
+  // ----- Events -----
+
   async getEvents(
     range: UmamiDateRange,
     unit: "hour" | "day" | "month" | "year" = "day",
   ): Promise<UmamiEventMetric[]> {
-    const result = await this.api.getEventMetrics(this.websiteId, {
-      startAt: String(range.startAt),
-      endAt: String(range.endAt),
-      unit,
-      timezone: this.timezone,
-    });
-    if (!result.ok) {
-      throw new Error(`Failed to get events: ${result.error ?? result.status}`);
-    }
-    return result.data as unknown as UmamiEventMetric[];
+    return this.request<UmamiEventMetric[]>(
+      `/websites/${this.websiteId}/events`,
+      { startAt: range.startAt, endAt: range.endAt, unit, timezone: this.timezone },
+    );
   }
 
-  /**
-   * Get current active visitors count.
-   */
+  // ----- Active Visitors -----
+
   async getActiveVisitors(): Promise<number> {
-    const result = await this.api.getWebsiteActive(this.websiteId);
-    if (!result.ok) {
-      throw new Error(`Failed to get active visitors: ${result.error ?? result.status}`);
-    }
-    return (result.data as UmamiActive).x;
+    const result = await this.request<{ x: number }>(
+      `/websites/${this.websiteId}/active`,
+    );
+    return result.x;
   }
 
   // ----- Convenience methods -----

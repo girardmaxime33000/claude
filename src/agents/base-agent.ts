@@ -71,8 +71,11 @@ export class MarketingAgent {
         console.log(`[${this.definition.name}] Analytics data loaded`);
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        console.warn(`[${this.definition.name}] Could not fetch analytics: ${msg.slice(0, 200)}`);
+        console.error(`[${this.definition.name}] ERREUR Umami: ${msg}`);
+        analyticsContext = `## ERREUR : Impossible de récupérer les données Umami\n\n**Erreur** : ${msg.slice(0, 300)}\n\nSignale cette erreur dans ton rapport et indique que les données n'ont pas pu être récupérées. Ne génère PAS de données fictives.`;
       }
+    } else if (this.definition.domain === "analytics" && !this.analyticsService) {
+      analyticsContext = `## ERREUR : Umami Analytics non configuré\n\nLes variables UMAMI_API_KEY et UMAMI_WEBSITE_ID ne sont pas définies dans le fichier .env.\nSignale cette erreur dans ton rapport.`;
     }
 
     const prompt = this.buildPrompt(task, analyticsContext);

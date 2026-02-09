@@ -64,18 +64,28 @@ export class MarketingAgent {
 
     // Fetch live analytics data for analytics-domain tasks
     let analyticsContext = "";
-    if (this.analyticsService && this.definition.domain === "analytics") {
-      try {
-        console.log(`[${this.definition.name}] Fetching Umami analytics data...`);
-        analyticsContext = await this.fetchAnalyticsContext(task);
-        console.log(`[${this.definition.name}] Analytics data loaded`);
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : String(err);
-        console.error(`[${this.definition.name}] ERREUR Umami: ${msg}`);
-        analyticsContext = `## ERREUR : Impossible de récupérer les données Umami\n\n**Erreur** : ${msg.slice(0, 300)}\n\nSignale cette erreur dans ton rapport et indique que les données n'ont pas pu être récupérées. Ne génère PAS de données fictives.`;
+    if (this.definition.domain === "analytics") {
+      if (!this.analyticsService) {
+        console.error(`[${this.definition.name}] ⚠️ analyticsService is NULL — UMAMI_API_KEY or UMAMI_WEBSITE_ID missing from .env`);
+        analyticsContext = `## ⚠️ ERREUR CRITIQUE : Umami Analytics non configuré
+
+Les variables d'environnement UMAMI_API_KEY et UMAMI_WEBSITE_ID ne sont pas définies dans le fichier .env.
+Tu ne peux PAS produire de rapport sans données. Indique cette erreur dans ton rapport.`;
+      } else {
+        try {
+          console.log(`[${this.definition.name}] ✅ analyticsService is available, fetching Umami data...`);
+          analyticsContext = await this.fetchAnalyticsContext(task);
+          console.log(`[${this.definition.name}] ✅ Analytics data loaded (${analyticsContext.length} chars)`);
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error(`[${this.definition.name}] ❌ ERREUR Umami: ${msg}`);
+          analyticsContext = `## ⚠️ ERREUR : Impossible de récupérer les données Umami
+
+**Erreur technique** : ${msg.slice(0, 300)}
+
+Tu ne peux PAS produire de rapport sans données réelles. Signale cette erreur dans ton rapport et indique la cause technique ci-dessus. Ne génère PAS de données fictives ou de framework théorique.`;
+        }
       }
-    } else if (this.definition.domain === "analytics" && !this.analyticsService) {
-      analyticsContext = `## ERREUR : Umami Analytics non configuré\n\nLes variables UMAMI_API_KEY et UMAMI_WEBSITE_ID ne sont pas définies dans le fichier .env.\nSignale cette erreur dans ton rapport.`;
     }
 
     const prompt = this.buildPrompt(task, analyticsContext);

@@ -252,6 +252,10 @@ src/
 │   └── analytics-service.ts      # Service d'agregation des donnees analytics
 ├── prompts/
 │   └── generator.ts              # Generateur de prompts inter-agents
+├── utils/
+│   ├── sanitizer.ts              # Protection prompt injection et path traversal (CRITIQUE-01/02)
+│   ├── http.ts                   # Fetch securise avec timeout, rate limiter et retry (HAUTE-02/04/05)
+│   └── validator.ts              # Validation des entrees CLI et limites de delegation (MOYENNE-02/04, CRITIQUE-04)
 └── trello/
     ├── client.ts                 # Client API Trello (CRUD cartes, listes, commentaires)
     └── card-creator.ts           # Creation de cartes Trello depuis les agents

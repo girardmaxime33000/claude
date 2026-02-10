@@ -198,7 +198,7 @@ ${delegationBlock}`;
         delegations.push({
           title,
           description,
-          stage: "todo",
+          stage: "review",
           targetDomain: domain as import("../config/types.js").AgentDomain,
           priority: priority || "medium",
         });

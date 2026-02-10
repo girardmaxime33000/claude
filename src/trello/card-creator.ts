@@ -85,7 +85,7 @@ export class CardCreator {
       const result = await this.createFromRequest({
         title: prompt.title,
         description: this.formatPromptAsDescription(prompt),
-        stage: "todo",
+        stage: "review",
         targetDomain: prompt.targetDomain,
         priority: "medium",
         checklist: prompt.acceptanceCriteria,

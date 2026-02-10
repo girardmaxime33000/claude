@@ -232,11 +232,11 @@ export class Orchestrator {
 
     await this.trello.addComment(
       task.trelloCardId,
-      `❌ **Erreur lors du traitement automatique**\n\n\`\`\`\n${message}\n\`\`\`\n\n*La carte a été remise dans Todo pour retraitement ou intervention manuelle.*`
+      `❌ **Erreur lors du traitement automatique**\n\n\`\`\`\n${message}\n\`\`\`\n\n*La carte a été déplacée dans Ticketing pour retraitement ou intervention manuelle.*`
     );
 
-    // Move back to todo
-    await this.trello.moveCard(task.trelloCardId, "todo");
+    // Move to ticketing for manual intervention
+    await this.trello.moveCard(task.trelloCardId, "ticketing");
   }
 
   /** Get current status of all running tasks */

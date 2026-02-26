@@ -5,15 +5,32 @@ import { AnalyticsService } from "./analytics/index.js";
 import { AGENT_DEFINITIONS } from "./config/agents.js";
 import type { AgentDomain, WorkflowStage } from "./config/types.js";
 import { validateDomain, validateStage, validatePriority } from "./utils/validator.js";
+import { t, setLocale, type Locale } from "./i18n/index.js";
 
 /**
  * CLI for interacting with the AI Marketing Agents system.
  *
  * SECURITY patches applied:
  * - MOYENNE-02: All CLI inputs are validated against allowed values
+ *
+ * Language:
+ * - Set via --lang fr|en flag or LANG_LOCALE env variable (default: fr)
  */
 async function cli() {
-  const [command, ...args] = process.argv.slice(2);
+  const rawArgs = process.argv.slice(2);
+
+  // Detect --lang flag early so translations apply to all output
+  const langFlagIdx = rawArgs.indexOf("--lang");
+  if (langFlagIdx !== -1) {
+    const lang = rawArgs[langFlagIdx + 1] as Locale | undefined;
+    if (lang === "fr" || lang === "en") {
+      setLocale(lang);
+      // Remove --lang and its value from args before further processing
+      rawArgs.splice(langFlagIdx, 2);
+    }
+  }
+
+  const [command, ...args] = rawArgs;
 
   switch (command) {
     case "run": {
@@ -29,8 +46,9 @@ async function cli() {
       }
       const config = loadConfig();
       const orchestrator = new Orchestrator(config);
+      console.log(`\n${t().cli.runStart}: ${cardId}…`);
       const result = await orchestrator.runSingle(cardId);
-      console.log("\n--- Result ---");
+      console.log(`\n${t().cli.runComplete}`);
       console.log(`Status: ${result.status}`);
       console.log(`Summary: ${result.summary}`);
       console.log(`Deliverable: ${result.deliverable.location}`);
@@ -50,9 +68,9 @@ async function cli() {
       const orchestrator = new Orchestrator(config);
       const status = orchestrator.getStatus();
       if (status.length === 0) {
-        console.log("No tasks currently running.");
+        console.log(t().cli.statusEmpty);
       } else {
-        console.log("Running tasks:");
+        console.log(`${t().cli.statusTitle}:`);
         for (const s of status) {
           console.log(
             `  - "${s.taskTitle}" by ${s.agent} (${Math.round(s.runningFor / 1000)}s)`
@@ -63,11 +81,11 @@ async function cli() {
     }
 
     case "agents": {
-      console.log("Available AI Marketing Agents:\n");
+      console.log(`${t().cli.agentsTitle}:\n`);
       for (const agent of AGENT_DEFINITIONS) {
         console.log(`  [${agent.domain.toUpperCase()}] ${agent.name}`);
         console.log(`    ${agent.description}`);
-        console.log(`    Capabilities: ${agent.capabilities.join(", ")}`);
+        console.log(`    ${t().cli.agentCapabilities}: ${agent.capabilities.join(", ")}`);
         console.log();
       }
       break;
@@ -109,9 +127,9 @@ async function cli() {
         priority,
       });
 
-      console.log("\n--- Card Created ---");
+      console.log(`\n--- ${t().cli.cardCreated} ---`);
       console.log(`Title: ${result.title}`);
-      console.log(`Domain: ${result.targetDomain}`);
+      console.log(`${t().cli.agentDomain}: ${result.targetDomain}`);
       console.log(`Card ID: ${result.cardId}`);
       console.log(`URL: ${result.cardUrl}`);
       break;
@@ -129,12 +147,12 @@ async function cli() {
       const config = loadConfig();
       const orchestrator = new Orchestrator(config);
 
-      console.log(`\nGenerating tasks for: "${objective}"...\n`);
+      console.log(`\n${t().cli.generateStart} "${objective}"…\n`);
       const { prompts, cards } = await orchestrator.generateAndCreateCards({
         objective,
       });
 
-      console.log(`\n--- ${cards.length} Cards Created ---\n`);
+      console.log(`\n--- ${cards.length} ${t().cli.cardCreated} ---\n`);
       for (let i = 0; i < cards.length; i++) {
         const card = cards[i];
         const prompt = prompts[i];
@@ -160,18 +178,18 @@ async function cli() {
       const config = loadConfig();
       const orchestrator = new Orchestrator(config);
 
-      console.log(`\nGenerating prompts for: "${objective}"...\n`);
+      console.log(`\n${t().cli.generateStart} "${objective}"…\n`);
       const prompts = await orchestrator.generatePrompts({ objective });
 
-      console.log(`--- ${prompts.length} Prompts Generated ---\n`);
+      console.log(`--- ${prompts.length} ${t().cli.previewTitle} ---\n`);
       for (const prompt of prompts) {
         console.log(`═══════════════════════════════════════`);
         console.log(`Agent: ${prompt.targetDomain.toUpperCase()}`);
         console.log(`Title: ${prompt.title}`);
-        console.log(`Deliverable: ${prompt.expectedDeliverable}`);
-        console.log(`\nInstructions:\n${prompt.instructions}`);
+        console.log(`${t().cli.previewDeliverable}: ${prompt.expectedDeliverable}`);
+        console.log(`\n${t().cli.previewInstructions}:\n${prompt.instructions}`);
         if (prompt.acceptanceCriteria.length) {
-          console.log(`\nAcceptance Criteria:`);
+          console.log(`\n${t().cli.previewCriteria}:`);
           for (const c of prompt.acceptanceCriteria) {
             console.log(`  - ${c}`);
           }
@@ -274,10 +292,53 @@ async function cli() {
       break;
     }
 
-    default:
-      console.log(`AI Marketing Agents CLI
+    default: {
+      const isFr = (process.env["LANG_LOCALE"] ?? "fr") === "fr" &&
+        !rawArgs.includes("--lang");
+      if (isFr) {
+        console.log(`AI Marketing Agents CLI
 
-Usage:
+Utilisation (ajouter --lang en pour l'anglais) :
+  npm run agent:run <card-id>                Exécuter une carte Trello
+  npm run agent:poll                         Lancer un cycle de polling
+  npm run agent:status                       Afficher les tâches en cours
+
+  tsx src/cli.ts agents                      Lister tous les agents
+  tsx src/cli.ts create-card <title> [opts]  Créer une carte Trello
+  tsx src/cli.ts generate <objectif>         Générer des prompts et créer les cartes
+  tsx src/cli.ts preview <objectif>          Prévisualiser les prompts (sans création)
+
+Commandes analytics :
+  tsx src/cli.ts analytics [--days N]        Rapport complet (défaut : 30 jours)
+  tsx src/cli.ts analytics:active            Visiteurs actifs en temps réel
+  tsx src/cli.ts analytics:pages [opts]      Top pages
+  tsx src/cli.ts analytics:referrers [opts]  Top referrers
+
+  Options analytics :
+    --days <N>    Nombre de jours (défaut : 30)
+    --limit <N>   Nombre de résultats (défaut : 20)
+
+Options de création de carte :
+  --domain <domaine>    Domaine cible (défaut : strategy)
+                        Valeurs : seo, content, ads, analytics, social, email, brand, strategy
+  --desc <description>  Description de la carte
+  --priority <niveau>   low | medium | high | urgent (défaut : medium)
+  --stage <étape>       backlog | todo | in_progress | review | done (défaut : todo)
+
+Mode continu :
+  npm start             Démarrer le polling Trello en continu
+  npm run dev           Démarrer en mode watch (redémarrage auto)
+
+Exemples :
+  tsx src/cli.ts create-card "Audit SEO du site" --domain seo --priority high
+  tsx src/cli.ts generate "Lancer une campagne pour notre produit SaaS"
+  tsx src/cli.ts analytics --days 7
+  tsx src/cli.ts analytics:pages --days 14 --limit 10
+`);
+      } else {
+        console.log(`AI Marketing Agents CLI
+
+Usage (add --lang fr for French):
   npm run agent:run <card-id>                Run a single Trello card
   npm run agent:poll                         Run one poll cycle
   npm run agent:status                       Show running tasks
@@ -309,11 +370,14 @@ Start continuous mode:
   npm run dev                   Start in watch mode (auto-restart)
 
 Examples:
-  tsx src/cli.ts create-card "Audit SEO du site" --domain seo --priority high
-  tsx src/cli.ts generate "Lancer une campagne de notoriété pour notre produit SaaS"
+  tsx src/cli.ts create-card "SEO audit" --domain seo --priority high
+  tsx src/cli.ts generate "Launch a brand awareness campaign for our SaaS"
   tsx src/cli.ts analytics --days 7
   tsx src/cli.ts analytics:pages --days 14 --limit 10
 `);
+      }
+      break;
+    }
   }
 }
 

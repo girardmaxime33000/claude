@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Maxime Girard — AI & Marketing</title>
+  <meta name="description" content="Maxime Girard — Développeur & Entrepreneur. Systèmes multi-agents IA pour le marketing digital." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0a0a0f;
+      --surface: #111118;
+      --border: #1e1e2e;
+      --accent: #6366f1;
+      --accent2: #8b5cf6;
+      --text: #e2e8f0;
+      --muted: #64748b;
+      --green: #10b981;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1rem;
+      overflow-x: hidden;
+    }
+
+    /* Animated background */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 80% 50% at 20% 20%, rgba(99,102,241,0.08) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 80% 80%, rgba(139,92,246,0.06) 0%, transparent 60%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      max-width: 640px;
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 3rem 2.5rem;
+      box-shadow: 0 0 0 1px rgba(99,102,241,0.05), 0 32px 64px rgba(0,0,0,0.5);
+      animation: fadeUp 0.6s ease both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(20px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Header */
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 1.5rem;
+      margin-bottom: 2rem;
+    }
+
+    .avatar {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.8rem;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+      letter-spacing: -1px;
+    }
+
+    .header-text h1 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #fff;
+    }
+
+    .header-text p {
+      font-size: 0.875rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+    }
+
+    .status {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.4rem;
+      font-size: 0.75rem;
+      color: var(--green);
+      margin-top: 0.4rem;
+    }
+
+    .status::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--green);
+      animation: pulse 2s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.4; }
+    }
+
+    /* Divider */
+    .divider {
+      height: 1px;
+      background: var(--border);
+      margin: 1.75rem 0;
+    }
+
+    /* Bio */
+    .bio {
+      font-size: 0.9375rem;
+      line-height: 1.7;
+      color: #94a3b8;
+      margin-bottom: 1.75rem;
+    }
+
+    .bio strong { color: var(--text); }
+
+    /* Tags */
+    .tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 1.75rem;
+    }
+
+    .tag {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.72rem;
+      padding: 0.3rem 0.75rem;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      background: rgba(255,255,255,0.03);
+      transition: border-color 0.2s, color 0.2s;
+    }
+
+    .tag:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* Project card */
+    .project {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.75rem;
+      background: rgba(99,102,241,0.03);
+      transition: border-color 0.2s;
+    }
+
+    .project:hover { border-color: rgba(99,102,241,0.3); }
+
+    .project-header {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      margin-bottom: 0.6rem;
+    }
+
+    .project-icon { font-size: 1.1rem; }
+
+    .project h3 {
+      font-size: 0.9375rem;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .project p {
+      font-size: 0.8125rem;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .project-stats {
+      display: flex;
+      gap: 1rem;
+      margin-top: 0.75rem;
+    }
+
+    .stat {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 0.7rem;
+      color: var(--muted);
+    }
+
+    .stat span { color: var(--accent); }
+
+    /* Links */
+    .links {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+    }
+
+    .link {
+      display: flex;
+      align-items: center;
+      gap: 0.6rem;
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      border: 1px solid var(--border);
+      text-decoration: none;
+      color: var(--muted);
+      font-size: 0.875rem;
+      transition: all 0.2s;
+      background: rgba(255,255,255,0.02);
+    }
+
+    .link:hover {
+      border-color: var(--accent);
+      color: var(--text);
+      background: rgba(99,102,241,0.06);
+      transform: translateY(-1px);
+    }
+
+    .link-icon { font-size: 1rem; flex-shrink: 0; }
+    .link-label { font-weight: 500; }
+
+    /* Footer */
+    .footer {
+      margin-top: 2rem;
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    @media (max-width: 480px) {
+      .card { padding: 2rem 1.5rem; }
+      .links { grid-template-columns: 1fr; }
+      .header { flex-direction: column; text-align: center; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+
+    <div class="header">
+      <div class="avatar">MG</div>
+      <div class="header-text">
+        <h1>Maxime Girard</h1>
+        <p>Développeur &amp; Entrepreneur · Bordeaux</p>
+        <span class="status">Disponible pour de nouveaux projets</span>
+      </div>
+    </div>
+
+    <p class="bio">
+      Je construis des <strong>systèmes autonomes propulsés par l'IA</strong>
+      pour automatiser le marketing digital — de l'orchestration d'agents à la
+      production de livrables sur GitHub, en passant par l'analyse
+      d'audience en temps réel.
+    </p>
+
+    <div class="tags">
+      <span class="tag">TypeScript</span>
+      <span class="tag">Node.js</span>
+      <span class="tag">Claude API</span>
+      <span class="tag">AI Agents</span>
+      <span class="tag">Marketing Automation</span>
+      <span class="tag">GitHub API</span>
+      <span class="tag">Trello</span>
+      <span class="tag">Umami Analytics</span>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="project">
+      <div class="project-header">
+        <span class="project-icon">🤖</span>
+        <h3>AI Marketing Agents</h3>
+      </div>
+      <p>
+        Système multi-agents IA autonome : 9 agents spécialisés (SEO, Content,
+        Ads, Analytics…) orchestrés via Trello, propulsés par Claude Sonnet,
+        avec génération automatique de livrables sur GitHub.
+      </p>
+      <div class="project-stats">
+        <span class="stat"><span>9</span> agents</span>
+        <span class="stat"><span>TS</span> + Claude API</span>
+        <span class="stat"><span>v1.4</span> stable</span>
+      </div>
+    </div>
+
+    <div class="links">
+      <a class="link" href="https://github.com/girardmaxime33000" target="_blank" rel="noopener">
+        <span class="link-icon">🐙</span>
+        <span class="link-label">GitHub</span>
+      </a>
+      <a class="link" href="https://github.com/girardmaxime33000/claude" target="_blank" rel="noopener">
+        <span class="link-icon">🤖</span>
+        <span class="link-label">AI Agents</span>
+      </a>
+      <a class="link" href="mailto:contact@girardmaxime.dev">
+        <span class="link-icon">✉️</span>
+        <span class="link-label">Email</span>
+      </a>
+      <a class="link" href="https://linkedin.com/in/girardmaxime33000" target="_blank" rel="noopener">
+        <span class="link-icon">💼</span>
+        <span class="link-label">LinkedIn</span>
+      </a>
+    </div>
+
+    <div class="footer">
+      © 2026 Maxime Girard · Bordeaux, France
+    </div>
+
+  </div>
+</body>
+</html>
